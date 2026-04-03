@@ -526,13 +526,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     CreateDrawingObjects()
 end)
 
--- ============ UI ============
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-local Window = WindUI:CreateWindow({
-    Title = "SILENT AIM",
-    Size = UDim2.fromOffset(420, 380),
-    Theme = "Dark"
-})
 
 local Tab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
 
@@ -594,8 +587,54 @@ local function UpdateFriendDropdown()
             end
         end
         if stillExists and selectedFriend ~= "ไม่มี" then
-    
+            friendDropdown:SetValue(selectedFriend)
+        else
+            friendDropdown:SetValue("ไม่มี")
+            selectedFriend = "ไม่มี"
+            excludedPlayerNames = {}
+        end
+    end
+end
 
+-- ============ สร้าง Dropdown เพื่อน ============
+local friendDropdown = Tab:Dropdown({
+    Title = "Safe Friend",
+    Desc = "เลือกเพื่อน - จะไม่ถูกเล็งและมี Highlight สีเขียว",
+    Values = {"ไม่มี"},
+    Default = 1,
+    Callback = function(value)
+        selectedFriend = value
+        excludedPlayerNames = {}
+        if value and value ~= "ไม่มี" then
+            table.insert(excludedPlayerNames, value)
+            print("✅ เพิ่มเพื่อน: " .. value)
+        else
+            print("❌ ล้างเพื่อนแล้ว")
+        end
+        UpdateExcludedHighlights()
+    end
+})
+
+Players.PlayerAdded:Connect(UpdateFriendDropdown)
+Players.PlayerRemoving:Connect(UpdateFriendDropdown)
+Players.PlayerAdded:Connect(UpdateExcludedHighlights)
+Players.PlayerRemoving:Connect(function(player)
+    if excludedPlayersUI[player] then
+        excludedPlayersUI[player]:Destroy()
+        excludedPlayersUI[player] = nil
+    end
+end)
+
+-- เมื่อตัวละครเกิดใหม่ ให้อัปเดต Highlight
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(UpdateExcludedHighlights)
+    end
+end
+
+-- ============ เรียกใช้ตอนเริ่มต้น ============
+UpdateFriendDropdown()
+UpdateExcludedHighlights()
 
 local PlayerTab = Window:Tab({Title = "Player", Icon = "🏃"})
 
