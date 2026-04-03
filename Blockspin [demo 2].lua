@@ -142,3 +142,17 @@ UserInputService.InputBegan:Connect(function(input, gp)
         toggle()
     end
 end)
+
+
+
+
+
+
+
+
+
+
+
+
+
+local MainTab = Window:Tab({Title = "MAIN", Icon = "user"})
