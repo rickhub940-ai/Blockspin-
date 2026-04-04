@@ -13,7 +13,7 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Silent Aim",
+    Title = "ERROR HUB | Demo | Free ",
     Icon = "",
     Author = "",
     Folder = "ERROR HUB",
@@ -555,26 +555,9 @@ if Remote and Remote.FireServer then
                         local origin = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") and LocalPlayer.Character.Head.Position
                         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
                         
-                        local aimPos = targetPart.Position
+                                                local aimPos = targetPart.Position
                         if hrp and origin then
-                            -- ====== ทำนายตำแหน่ง ======
-                            local pingTime = GetPing()
-                            local distance = (targetPart.Position - origin).Magnitude
-                            local baseTravelTime = distance / 2500
-                            local totalTravelTime = baseTravelTime + pingTime
-                            
-                            local predictionReduction = DetectAbnormalMovement(target, targetPart.Position, hrp.Velocity)
-                            local adjustedTravelTime = totalTravelTime * (1 - predictionReduction)
-                            
-                            local predictedPos = targetPart.Position + (hrp.Velocity * adjustedTravelTime)
-                            
-                            if predictionReduction > 0.5 then
-                                predictedPos = (targetPart.Position * 0.6) + (predictedPos * 0.4)
-                            elseif predictionReduction > 0.2 then
-                                predictedPos = (targetPart.Position * 0.3) + (predictedPos * 0.7)
-                            end
-                            
-                            aimPos = predictedPos
+                            aimPos = PredictPosition(origin, targetPart.Position, hrp.Velocity, target)
                         end
 
                         -- สร้างเอฟเฟคกระสุน
@@ -606,3 +589,181 @@ if Remote and Remote.FireServer then
         end)
     end)
 end
+
+-- ========== Main Render Loop ==========
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        
+        if SilentFOVCircle and not isMobile then
+            SilentFOVCircle.Position = center
+            SilentFOVCircle.Radius = FOV
+        end
+        if SilentFOVCircle then
+            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
+        end
+        
+        if not SilentAimEnabled then
+            if tracerLine then tracerLine.Visible = false end
+            if targetDot then targetDot.Visible = false end
+            return
+        end
+        
+        local target, targetPart = GetClosestTarget()
+        if target and targetPart then
+            local humanoid = target.Character:FindFirstChild("Humanoid")
+            
+            if humanoid and humanoid.Health > 0 then
+                local origin = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") and LocalPlayer.Character.Head.Position
+                local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+                
+                local aimPos = targetPart.Position
+                if hrp and origin then
+                    aimPos = PredictPosition(origin, targetPart.Position, hrp.Velocity, target)
+                end
+                
+                local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
+                
+                if onScreen then
+                    if tracerLine then
+                        tracerLine.Visible = true
+                        tracerLine.From = center
+                        tracerLine.To = Vector2.new(screenPos.X, screenPos.Y)
+                        tracerLine.Color = Color3.fromRGB(255, 50, 50)
+                    end
+                    if targetDot then
+                        targetDot.Visible = true
+                        targetDot.Position = Vector2.new(screenPos.X, screenPos.Y)
+                    end
+                else
+                    if tracerLine then tracerLine.Visible = false end
+                    if targetDot then targetDot.Visible = false end
+                end
+            else
+                if tracerLine then tracerLine.Visible = false end
+                if targetDot then targetDot.Visible = false end
+            end
+        else
+            if tracerLine then tracerLine.Visible = false end
+            if targetDot then targetDot.Visible = false end
+        end
+    end)
+end)
+
+-- ========== Initial Setup ==========
+CreateFOVCircle()
+CreateDrawingObjects()
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.1)
+    CreateFOVCircle()
+    CreateDrawingObjects()
+end)
+
+local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
+
+local SilentToggle = CombatTab:Toggle({
+    Title = "Silent Aim | Wallbang",
+    Desc = "ล็อค|ยิงทะลุ",
+    Default = false,
+    Callback = function(state)
+        SilentAimEnabled = state
+        if SilentFOVCircle then
+            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
+        end
+    end
+})
+myConfig:Register("SilentAim", SilentToggle)
+
+local AimPartDropdown = CombatTab:Dropdown({
+    Title = "Aim Part",
+    Desc = "เลือกส่วนที่จะล็อค",
+    Options = {"Head", "Body"},
+    Default = "Head",
+    Callback = function(option)
+        AimPart = option
+    end
+})
+myConfig:Register("AimPart", AimPartDropdown)
+
+local FOVSlider = CombatTab:Slider({
+    Title = "FOV Radius",
+    Step = 1,
+    Value = {Min = 20, Max = 750, Default = FOV},
+    Callback = function(value)
+        FOV = tonumber(value) or 120
+        if SilentFOVCircle then
+            if isMobile then
+                SilentFOVCircle.Size = UDim2.fromOffset(FOV * 2, FOV * 2)
+            else
+                SilentFOVCircle.Radius = FOV
+            end
+        end
+    end
+})
+myConfig:Register("FOVRadius", FOVSlider)
+
+local ShowFOVToggle = CombatTab:Toggle({
+    Title = "Show FOV Circle",
+    Desc = "แสดงวงกลม FOV บนหน้าจอ",
+    Default = ShowFOV,
+    Callback = function(state)
+        ShowFOV = state
+        if SilentFOVCircle then
+            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
+        end
+    end
+})
+myConfig:Register("ShowFOV", ShowFOVToggle)
+
+CombatTab:Divider()
+
+local FriendsInput = CombatTab:Input({
+    Title = "Safe Friend List",
+    Desc = "ชื่อผู้เล่นที่ไม่โดนล็อค (เว้นวรรค)",
+    Value = "",
+    InputIcon = "shield-check",
+    Type = "Input",
+    Placeholder = "Friend1 Friend2",
+    Callback = function(input)
+        excludedPlayerNames = {}
+        for name in string.gmatch(input, "%S+") do
+            table.insert(excludedPlayerNames, name)
+        end
+    end
+})
+myConfig:Register("FriendsList", FriendsInput)
+local excludedPlayersUI = {}
+local function UpdateExcludedHighlights()
+    for _, player in pairs(Players:GetPlayers()) do
+        if isPlayerExcluded(player.Name) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            if not excludedPlayersUI[player] then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(0, 255, 0)
+                highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
+                highlight.FillTransparency = 0.3
+                highlight.OutlineTransparency = 0
+                highlight.Parent = player.Character
+                excludedPlayersUI[player] = highlight
+            end
+        else
+            if excludedPlayersUI[player] then
+                excludedPlayersUI[player]:Destroy()
+                excludedPlayersUI[player] = nil
+            end
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(UpdateExcludedHighlights)
+Players.PlayerRemoving:Connect(function(player)
+    if excludedPlayersUI[player] then
+        excludedPlayersUI[player]:Destroy()
+        excludedPlayersUI[player] = nil
+    end
+end)
+task.spawn(function()
+    while task.wait(2) do
+        UpdateExcludedHighlights()
+    end
+end)
