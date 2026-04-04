@@ -13,7 +13,7 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Demo | Free ",
+    Title = "ERROR HUB | Silent Aim",
     Icon = "",
     Author = "",
     Folder = "ERROR HUB",
@@ -32,7 +32,7 @@ local SilentAimEnabled = false
 local ShowFOV = true
 local FOV = 120
 local excludedPlayerNames = {}
-local AimPart = "Head"
+local AimPart = "Head"  -- "Head" หรือ "Body"
 
 -- ========== ระบบกระสุนสลับดำ/ขาว ==========
 local lastColorWasBlack = false
@@ -56,10 +56,114 @@ local function GetPing()
     return 0.05
 end
 
+-- ========== ฟังก์ชัน Ballistic (สำหรับระยะไกล) ==========
+local function solveQuadratic(A, B, C)
+    local discriminant = B^2 - 4*A*C
+    if discriminant < 0 then
+        return nil, nil
+    end
+    local sqrtDisc = math.sqrt(discriminant)
+    local root1 = (-B - sqrtDisc) / (2*A)
+    local root2 = (-B + sqrtDisc) / (2*A)
+    return root1, root2
+end
+
+local function getBallisticFlightTime(direction, gravity, projectileSpeed)
+    local root1, root2 = solveQuadratic(
+        gravity:Dot(gravity) / 3.5,
+        gravity:Dot(direction) - projectileSpeed^2,
+        direction:Dot(direction)
+    )
+    if root1 and root2 then
+        if root1 > 0 and root1 < root2 then
+            return math.sqrt(root1)
+        elseif root2 > 0 and root2 < root1 then
+            return math.sqrt(root2)
+        end
+    end
+    return (direction.Magnitude / projectileSpeed)
+end
+
+local function projectileDrop(origin, target, projectileSpeed, acceleration)
+    local gravity = Vector3.new(0, -acceleration, 0)
+    local time = getBallisticFlightTime(target - origin, gravity, projectileSpeed)
+    return 0.5 * gravity * (time^2)
+end
+
+-- ========== ระบบตรวจจับ Anti-Look ของเป้า ==========
+local AntiLookUsers = {}
+
+local function IsUsingAntiLook(character)
+    if not character then return false end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    
+    local vel = hrp.Velocity
+    if vel.Magnitude > 100 and math.abs(vel.Y) > 200 then
+        return true
+    end
+    return false
+end
+
+local function GetStablePosition(player, currentPos)
+    if not IsUsingAntiLook(player.Character) then
+        return currentPos
+    end
+    
+    local now = tick()
+    local data = AntiLookUsers[player]
+    
+    if not data then
+        AntiLookUsers[player] = {
+            positions = {},
+            times = {},
+            stablePos = currentPos,
+            lastUpdate = now
+        }
+        return currentPos
+    end
+    
+    table.insert(data.positions, currentPos)
+    table.insert(data.times, now)
+    
+    while #data.times > 0 and now - data.times[1] > 0.3 do
+        table.remove(data.positions, 1)
+        table.remove(data.times, 1)
+    end
+    
+    if #data.positions >= 3 then
+        local freq = {}
+        for _, pos in ipairs(data.positions) do
+            local key = string.format("%.1f,%.1f,%.1f", pos.X, pos.Y, pos.Z)
+            freq[key] = (freq[key] or 0) + 1
+        end
+        
+        local maxCount = 0
+        local bestKey = nil
+        for key, count in pairs(freq) do
+            if count > maxCount then
+                maxCount = count
+                bestKey = key
+            end
+        end
+        
+        if bestKey then
+            local x, y, z = string.match(bestKey, "(.-),(.-),(.-)")
+            data.stablePos = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+        end
+    end
+    
+    return data.stablePos
+end
+
 -- ========== ระบบตรวจจับการเคลื่อนไหวผิดปกติ ==========
 local MovementData = {}
 
 local function DetectAbnormalMovement(player, currentPos, currentVel)
+    if IsUsingAntiLook(player.Character) then
+        return 0.9
+    end
+    
     local now = tick()
     local data = MovementData[player]
     
@@ -180,51 +284,32 @@ local function DetectAbnormalMovement(player, currentPos, currentVel)
     return predictionReduction
 end
 
--- ========== ฟังก์ชัน Ballistic ==========
-local function solveQuadratic(A, B, C)
-    local discriminant = B^2 - 4*A*C
-    if discriminant < 0 then
-        return nil, nil
-    end
-    local sqrtDisc = math.sqrt(discriminant)
-    local root1 = (-B - sqrtDisc) / (2*A)
-    local root2 = (-B + sqrtDisc) / (2*A)
-    return root1, root2
-end
-
-local function getBallisticFlightTime(direction, gravity, projectileSpeed)
-    local root1, root2 = solveQuadratic(
-        gravity:Dot(gravity) / 3.5,
-        gravity:Dot(direction) - projectileSpeed^2,
-        direction:Dot(direction)
-    );
-    if root1 and root2 then
-        if root1 > 0 and root1 < root2 then
-            return math.sqrt(root1);
-        elseif root2 > 0 and root2 < root1 then
-            return math.sqrt(root2);
-        end;
-    end;
-    return 0;
-end;
-
-local function projectileDrop(origin, target, projectileSpeed, acceleration)
-    local gravity = Vector3.new() + Vector3.yAxis * (acceleration * 2);
-    local time = getBallisticFlightTime(target - origin, gravity, projectileSpeed)
-    return -0.001 * gravity * time^2;
-end
-
+-- ========== PredictPosition ฉบับสมบูรณ์ (ระยะใกล้ + ระยะไกล) ==========
 local function PredictPosition(origin, targetPos, targetVel, player)
-    local pingTime = GetPing()
+    -- Anti-Look: ล็อคตำแหน่งปัจจุบัน
+    if IsUsingAntiLook(player.Character) then
+        return targetPos
+    end
+    
     local distance = (targetPos - origin).Magnitude
-    local baseTravelTime = distance / 2500
+    local projectileSpeed = 2500
+    local gravity = 196.2
+    
+    -- ระยะไกล (มากกว่า 100 สตั๊ด) ใช้ Ballistic
+    if distance > 100 then
+        local travelTime = distance / projectileSpeed
+        local pingComp = GetPing()
+        local predictedPos = targetPos + (targetVel * (travelTime + pingComp))
+        local drop = projectileDrop(origin, predictedPos, projectileSpeed, gravity)
+        return predictedPos + drop
+    end
+    
+    -- ระยะใกล้ (น้อยกว่า 100 สตั๊ด) ใช้แบบง่าย
+    local pingTime = GetPing()
+    local baseTravelTime = distance / projectileSpeed
     local totalTravelTime = baseTravelTime + pingTime
     
-    local predictionReduction = 0
-    if player then
-        predictionReduction = DetectAbnormalMovement(player, targetPos, targetVel)
-    end
-    
+    local predictionReduction = DetectAbnormalMovement(player, targetPos, targetVel)
     local adjustedTravelTime = totalTravelTime * (1 - predictionReduction)
     
     local predictedPos = targetPos + (targetVel * adjustedTravelTime)
@@ -234,10 +319,6 @@ local function PredictPosition(origin, targetPos, targetVel, player)
     elseif predictionReduction > 0.2 then
         predictedPos = (targetPos * 0.3) + (predictedPos * 0.7)
     end
-    
-    local dropMultiplier = 1 - (predictionReduction * 0.5)
-    local drop = projectileDrop(origin, predictedPos, 1000, 196.2) * dropMultiplier
-    predictedPos = predictedPos + drop
     
     return predictedPos
 end
@@ -249,34 +330,29 @@ local function GetTargetPart(character)
     if not humanoid or humanoid.Health <= 0 then return nil, nil end
     
     local targetPart = nil
+    
     if AimPart == "Head" then
         targetPart = character:FindFirstChild("Head")
-    else
+    elseif AimPart == "Body" then
         targetPart = character:FindFirstChild("HumanoidRootPart")
         if not targetPart then
             targetPart = character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
         end
     end
+    
+    if not targetPart then
+        targetPart = character:FindFirstChild("HumanoidRootPart")
+    end
+    
     return targetPart, humanoid
 end
 
+-- ========== FOV Circle ==========
 local SilentFOVCircle = nil
 local tracerLine = nil
 local targetDot = nil
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
--- ========== Utility ==========
-local function isPlayerExcluded(playerName)
-    local lowerPlayerName = string.lower(playerName)
-    for _, excludedName in ipairs(excludedPlayerNames) do
-        if excludedName ~= "" and string.find(lowerPlayerName, string.lower(excludedName)) then
-            return true
-        end
-    end
-    return false
-end
-
--- ========== FOV Circle ==========
 local function CreateFOVCircle()
     if not isMobile then
         if SilentFOVCircle then SilentFOVCircle:Remove() end
@@ -336,6 +412,15 @@ local function CreateDrawingObjects()
 end
 
 -- ========== Target Selection ==========
+local function isPlayerExcluded(playerName)
+    for _, excludedName in ipairs(excludedPlayerNames) do
+        if excludedName == playerName then
+            return true
+        end
+    end
+    return false
+end
+
 local function GetClosestTarget()
     local closest = nil
     local closestPart = nil
@@ -346,13 +431,15 @@ local function GetClosestTarget()
         if player ~= LocalPlayer and player.Character then
             local targetPart, humanoid = GetTargetPart(player.Character)
             
-            if targetPart and humanoid and humanoid.Health > 0 then
-                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+            if targetPart and humanoid and humanoid.Health > 0 and not isPlayerExcluded(player.Name) then
+                local truePos = GetStablePosition(player, targetPart.Position)
+                local screenPos, onScreen = Camera:WorldToViewportPoint(truePos)
+                
                 if onScreen then
                     local screenVector = Vector2.new(screenPos.X, screenPos.Y)
                     local distanceFromCenter = (screenVector - center).Magnitude
                     
-                    if distanceFromCenter <= FOV and not isPlayerExcluded(player.Name) then
+                    if distanceFromCenter <= FOV then
                         if distanceFromCenter < shortestDistance then
                             shortestDistance = distanceFromCenter
                             closest = player
@@ -366,14 +453,13 @@ local function GetClosestTarget()
     return closest, closestPart
 end
 
--- ========== เอฟเฟคกระสุนแบบใหม่ (Beam กลม อยู่นาน 1 วินาที) ==========
+-- ========== เอฟเฟคกระสุน ==========
 local function CreateBulletEffect(origin, targetPos)
     pcall(function()
         local bulletColor = GetBulletColor()
         local distance = (targetPos - origin).Magnitude
         local direction = (targetPos - origin).Unit
         
-        -- ส่วนเริ่มต้นและปลายทางสำหรับ Beam
         local startPart = Instance.new("Part")
         startPart.Size = Vector3.new(0.1, 0.1, 0.1)
         startPart.Position = origin
@@ -396,7 +482,6 @@ local function CreateBulletEffect(origin, targetPos)
         local endAttachment = Instance.new("Attachment")
         endAttachment.Parent = endPart
         
-        -- Beam กระสุนกลม
         local beam = Instance.new("Beam")
         beam.Attachment0 = startAttachment
         beam.Attachment1 = endAttachment
@@ -408,7 +493,6 @@ local function CreateBulletEffect(origin, targetPos)
         beam.Transparency = NumberSequence.new(0.1)
         beam.Parent = Workspace
         
-        -- ไฟส่องสว่าง
         local spotlight = Instance.new("SpotLight")
         spotlight.Brightness = 4
         spotlight.Range = 12
@@ -416,7 +500,6 @@ local function CreateBulletEffect(origin, targetPos)
         spotlight.Enabled = true
         spotlight.Parent = beam
         
-        -- อนุภาคตามแนว
         for i = 1, 8 do
             local t = i / 8
             local particlePos = origin + direction * (distance * t)
@@ -432,7 +515,6 @@ local function CreateBulletEffect(origin, targetPos)
             Debris:AddItem(particle, 1.0)
         end
         
-        -- ปากกระบอก
         local muzzleFlash = Instance.new("Part")
         muzzleFlash.Shape = Enum.PartType.Ball
         muzzleFlash.Size = Vector3.new(0.55, 0.55, 0.55)
@@ -445,7 +527,6 @@ local function CreateBulletEffect(origin, targetPos)
         muzzleFlash.Parent = Workspace
         Debris:AddItem(muzzleFlash, 1.0)
         
-        -- แสงแฟลช
         local light = Instance.new("PointLight")
         light.Color = bulletColor
         light.Brightness = 5
@@ -453,7 +534,6 @@ local function CreateBulletEffect(origin, targetPos)
         light.Parent = muzzleFlash
         Debris:AddItem(light, 1.0)
         
-        -- ระเบิดที่เป้า
         for i = 1, 35 do
             local particle = Instance.new("Part")
             particle.Shape = Enum.PartType.Ball
@@ -475,7 +555,6 @@ local function CreateBulletEffect(origin, targetPos)
             Debris:AddItem(particle, 1.0)
         end
         
-        -- วงแหวนระเบิด
         local ring = Instance.new("Part")
         ring.Shape = Enum.PartType.Ball
         ring.Size = Vector3.new(2.2, 2.2, 2.2)
@@ -496,7 +575,6 @@ local function CreateBulletEffect(origin, targetPos)
             ring:Destroy()
         end)
         
-        -- ลบ Beam และ Parts
         Debris:AddItem(beam, 1.0)
         Debris:AddItem(startPart, 1.0)
         Debris:AddItem(endPart, 1.0)
@@ -509,261 +587,4 @@ local function CreateHitEffect(character)
         if character and character.Parent then
             local humanoid = character:FindFirstChild("Humanoid")
             if humanoid and humanoid.Health > 0 then
-                local hitColor = lastColorWasBlack and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
-                
-                for _, part in ipairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local box = Instance.new("Part")
-                        box.Size = part.Size + Vector3.new(0.1, 0.1, 0.1)
-                        box.CFrame = part.CFrame
-                        box.Anchored = true
-                        box.CanCollide = false
-                        box.Material = Enum.Material.Neon
-                        box.Color = hitColor
-                        box.Transparency = 0.4
-                        box.Parent = Workspace
-                        
-                        local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Linear)
-                        TweenService:Create(box, tweenInfo, {Transparency = 1}):Play()
-                        Debris:AddItem(box, 1)
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- ========== Remote Hook ==========
-local Remote
-pcall(function()
-    Remote = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("Send", 5)
-end)
-
-local oldFire
-if Remote and Remote.FireServer then
-    pcall(function()
-        oldFire = hookfunction(Remote.FireServer, function(self, ...)
-            if self ~= Remote then return oldFire(self, ...) end
-            local args = {...}
-
-            if SilentAimEnabled and args[2] == "shoot_gun" then
-                local target, targetPart = GetClosestTarget()
-                if target and targetPart then
-                    local humanoid = target.Character:FindFirstChild("Humanoid")
-                    
-                    if humanoid and humanoid.Health > 0 then
-                        local origin = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") and LocalPlayer.Character.Head.Position
-                        local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                        
-                                                local aimPos = targetPart.Position
-                        if hrp and origin then
-                            aimPos = PredictPosition(origin, targetPart.Position, hrp.Velocity, target)
-                        end
-
-                        -- สร้างเอฟเฟคกระสุน
-                        if origin then
-                            CreateBulletEffect(origin, aimPos)
-                        end
-
-                        CreateHitEffect(target.Character)
-
-                        -- Wallbang
-                        args[4] = CFrame.new(
-                            1/0, 1/0, 1/0,
-                            0/0, 0/0, 0/0,
-                            0/0, 0/0, 0/0,
-                            0/0, 0/0, 0/0
-                        )
-                        args[5] = {
-                            [1] = {
-                                [1] = {
-                                    ["Instance"] = targetPart,
-                                    ["Position"] = aimPos
-                                }
-                            }
-                        }
-                    end
-                end
-            end
-            return oldFire(self, unpack(args))
-        end)
-    end)
-end
-
--- ========== Main Render Loop ==========
-RunService.RenderStepped:Connect(function()
-    pcall(function()
-        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        
-        if SilentFOVCircle and not isMobile then
-            SilentFOVCircle.Position = center
-            SilentFOVCircle.Radius = FOV
-        end
-        if SilentFOVCircle then
-            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
-        end
-        
-        if not SilentAimEnabled then
-            if tracerLine then tracerLine.Visible = false end
-            if targetDot then targetDot.Visible = false end
-            return
-        end
-        
-        local target, targetPart = GetClosestTarget()
-        if target and targetPart then
-            local humanoid = target.Character:FindFirstChild("Humanoid")
-            
-            if humanoid and humanoid.Health > 0 then
-                local origin = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head") and LocalPlayer.Character.Head.Position
-                local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                
-                local aimPos = targetPart.Position
-                if hrp and origin then
-                    aimPos = PredictPosition(origin, targetPart.Position, hrp.Velocity, target)
-                end
-                
-                local screenPos, onScreen = Camera:WorldToViewportPoint(aimPos)
-                
-                if onScreen then
-                    if tracerLine then
-                        tracerLine.Visible = true
-                        tracerLine.From = center
-                        tracerLine.To = Vector2.new(screenPos.X, screenPos.Y)
-                        tracerLine.Color = Color3.fromRGB(255, 50, 50)
-                    end
-                    if targetDot then
-                        targetDot.Visible = true
-                        targetDot.Position = Vector2.new(screenPos.X, screenPos.Y)
-                    end
-                else
-                    if tracerLine then tracerLine.Visible = false end
-                    if targetDot then targetDot.Visible = false end
-                end
-            else
-                if tracerLine then tracerLine.Visible = false end
-                if targetDot then targetDot.Visible = false end
-            end
-        else
-            if tracerLine then tracerLine.Visible = false end
-            if targetDot then targetDot.Visible = false end
-        end
-    end)
-end)
-
--- ========== Initial Setup ==========
-CreateFOVCircle()
-CreateDrawingObjects()
-
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.1)
-    CreateFOVCircle()
-    CreateDrawingObjects()
-end)
-
-local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
-
-local SilentToggle = CombatTab:Toggle({
-    Title = "Silent Aim | Wallbang",
-    Desc = "ล็อค|ยิงทะลุ",
-    Default = false,
-    Callback = function(state)
-        SilentAimEnabled = state
-        if SilentFOVCircle then
-            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
-        end
-    end
-})
-myConfig:Register("SilentAim", SilentToggle)
-
-local AimPartDropdown = CombatTab:Dropdown({
-    Title = "Aim Part",
-    Desc = "เลือกส่วนที่จะล็อค",
-    Options = {"Head", "Body"},
-    Default = "Head",
-    Callback = function(option)
-        AimPart = option
-    end
-})
-myConfig:Register("AimPart", AimPartDropdown)
-
-local FOVSlider = CombatTab:Slider({
-    Title = "FOV Radius",
-    Step = 1,
-    Value = {Min = 20, Max = 750, Default = FOV},
-    Callback = function(value)
-        FOV = tonumber(value) or 120
-        if SilentFOVCircle then
-            if isMobile then
-                SilentFOVCircle.Size = UDim2.fromOffset(FOV * 2, FOV * 2)
-            else
-                SilentFOVCircle.Radius = FOV
-            end
-        end
-    end
-})
-myConfig:Register("FOVRadius", FOVSlider)
-
-local ShowFOVToggle = CombatTab:Toggle({
-    Title = "Show FOV Circle",
-    Desc = "แสดงวงกลม FOV บนหน้าจอ",
-    Default = ShowFOV,
-    Callback = function(state)
-        ShowFOV = state
-        if SilentFOVCircle then
-            SilentFOVCircle.Visible = ShowFOV and SilentAimEnabled
-        end
-    end
-})
-myConfig:Register("ShowFOV", ShowFOVToggle)
-
-CombatTab:Divider()
-
-local FriendsInput = CombatTab:Input({
-    Title = "Safe Friend List",
-    Desc = "ชื่อผู้เล่นที่ไม่โดนล็อค (เว้นวรรค)",
-    Value = "",
-    InputIcon = "shield-check",
-    Type = "Input",
-    Placeholder = "Friend1 Friend2",
-    Callback = function(input)
-        excludedPlayerNames = {}
-        for name in string.gmatch(input, "%S+") do
-            table.insert(excludedPlayerNames, name)
-        end
-    end
-})
-myConfig:Register("FriendsList", FriendsInput)
-local excludedPlayersUI = {}
-local function UpdateExcludedHighlights()
-    for _, player in pairs(Players:GetPlayers()) do
-        if isPlayerExcluded(player.Name) and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            if not excludedPlayersUI[player] then
-                local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(0, 255, 0)
-                highlight.OutlineColor = Color3.fromRGB(0, 255, 0)
-                highlight.FillTransparency = 0.3
-                highlight.OutlineTransparency = 0
-                highlight.Parent = player.Character
-                excludedPlayersUI[player] = highlight
-            end
-        else
-            if excludedPlayersUI[player] then
-                excludedPlayersUI[player]:Destroy()
-                excludedPlayersUI[player] = nil
-            end
-        end
-    end
-end
-
-Players.PlayerAdded:Connect(UpdateExcludedHighlights)
-Players.PlayerRemoving:Connect(function(player)
-    if excludedPlayersUI[player] then
-        excludedPlayersUI[player]:Destroy()
-        excludedPlayersUI[player] = nil
-    end
-end)
-task.spawn(function()
-    while task.wait(2) do
-        UpdateExcludedHighlights()
-    end
-end)
+                loc
