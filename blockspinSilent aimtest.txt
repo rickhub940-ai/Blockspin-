@@ -885,9 +885,3 @@ task.spawn(function()
     end
 end)
 
--- ========== Notify ==========
-WindUI:Notify({
-    Title = "✅ Silent Aim Ready",
-    Description = "โหลด Silent Aim + ระบบ Ballistic เรียบร้อย",
-    Duration = 3
-})
