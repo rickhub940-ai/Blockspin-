@@ -11,29 +11,30 @@ local LocalPlayer = Players.LocalPlayer
 -- ========== โหลด WindUI ==========
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
-
+-- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "Dnn HUB | Silent Aim",
+    Title = "ERROR HUB | Silent Aim",
     Icon = "",
-    Author = "[ by 009.exe ]",
-    Folder = "Dnn Hub",
+    Author = "",
+    Folder = "ERROR HUB",
     Size = UDim2.fromOffset(450, 400),
     Theme = "Dark",
     Transparent = true,
     Resizable = true,
 })
 
-
+-- ========== Config Manager ==========
 local ConfigManager = Window.ConfigManager
 local myConfig = ConfigManager:CreateConfig("SilentAimConfig")
 
-
+-- ========== ตัวแปร Silent Aim ==========
 local SilentAimEnabled = false
-local ShowFOV = false
+local ShowFOV = true
 local FOV = 120
 local excludedPlayerNames = {}
-local AimPart = "Head"
+local AimPart = "Head"  -- "Head" หรือ "Body"
 
+-- ========== ระบบกระสุนสลับดำ/ขาว ==========
 local lastColorWasBlack = false
 
 local function GetBulletColor()
@@ -41,6 +42,7 @@ local function GetBulletColor()
     return lastColorWasBlack and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(255, 255, 255)
 end
 
+-- ========== วัด Ping ==========
 local function GetPing()
     local stats = game:GetService("Stats")
     local networkStats = stats:FindFirstChild("Network")
@@ -53,6 +55,8 @@ local function GetPing()
     end
     return 0.05
 end
+
+-- ========== ฟังก์ชัน Ballistic (สำหรับระยะไกล) ==========
 local function solveQuadratic(A, B, C)
     local discriminant = B^2 - 4*A*C
     if discriminant < 0 then
@@ -291,6 +295,7 @@ local function PredictPosition(origin, targetPos, targetVel, player)
     local projectileSpeed = 2500
     local gravity = 196.2
     
+    -- ระยะไกล (มากกว่า 100 สตั๊ด) ใช้ Ballistic
     if distance > 100 then
         local travelTime = distance / projectileSpeed
         local pingComp = GetPing()
@@ -298,12 +303,17 @@ local function PredictPosition(origin, targetPos, targetVel, player)
         local drop = projectileDrop(origin, predictedPos, projectileSpeed, gravity)
         return predictedPos + drop
     end
+    
+    -- ระยะใกล้ (น้อยกว่า 100 สตั๊ด) ใช้แบบง่าย
     local pingTime = GetPing()
     local baseTravelTime = distance / projectileSpeed
     local totalTravelTime = baseTravelTime + pingTime
+    
     local predictionReduction = DetectAbnormalMovement(player, targetPos, targetVel)
     local adjustedTravelTime = totalTravelTime * (1 - predictionReduction)
+    
     local predictedPos = targetPos + (targetVel * adjustedTravelTime)
+    
     if predictionReduction > 0.5 then
         predictedPos = (targetPos * 0.6) + (predictedPos * 0.4)
     elseif predictionReduction > 0.2 then
@@ -313,6 +323,7 @@ local function PredictPosition(origin, targetPos, targetVel, player)
     return predictedPos
 end
 
+-- ========== หา Hitbox ==========
 local function GetTargetPart(character)
     if not character then return nil, nil end
     local humanoid = character:FindFirstChild("Humanoid")
@@ -336,7 +347,7 @@ local function GetTargetPart(character)
     return targetPart, humanoid
 end
 
-
+-- ========== FOV Circle ==========
 local SilentFOVCircle = nil
 local tracerLine = nil
 local targetDot = nil
@@ -379,6 +390,7 @@ local function CreateFOVCircle()
     end
 end
 
+-- ========== Drawing Objects ==========
 local function CreateDrawingObjects()
     if tracerLine then tracerLine:Remove() end
     if targetDot then targetDot:Remove() end
@@ -399,7 +411,7 @@ local function CreateDrawingObjects()
     targetDot.Visible = false
 end
 
--- Target Selection 
+-- ========== Target Selection ==========
 local function isPlayerExcluded(playerName)
     for _, excludedName in ipairs(excludedPlayerNames) do
         if excludedName == playerName then
@@ -441,7 +453,7 @@ local function GetClosestTarget()
     return closest, closestPart
 end
 
--- เอฟเฟคกระสุน
+-- ========== เอฟเฟคกระสุน ==========
 local function CreateBulletEffect(origin, targetPos)
     pcall(function()
         local bulletColor = GetBulletColor()
@@ -599,7 +611,7 @@ local function CreateHitEffect(character)
     end)
 end
 
--- Remote Hook
+-- ========== Remote Hook ==========
 local Remote
 pcall(function()
     Remote = ReplicatedStorage:WaitForChild("Remotes", 5):WaitForChild("Send", 5)
@@ -654,6 +666,7 @@ if Remote and Remote.FireServer then
     end)
 end
 
+-- ========== Main Render Loop ==========
 RunService.RenderStepped:Connect(function()
     pcall(function()
         local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
@@ -723,12 +736,13 @@ LocalPlayer.CharacterAdded:Connect(function()
     CreateDrawingObjects()
 end)
 
+-- ========== สร้าง UI Tab ==========
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
 
-
+-- Silent Aim Toggle
 local SilentToggle = CombatTab:Toggle({
     Title = "Silent Aim | Wallbang",
-    Desc = "ล็อค|ยิงทะลุ",
+    Desc = "ล็อคหัว/ตัวอัตโนมัติ + ยิงทะลุกำแพง",
     Default = false,
     Callback = function(state)
         SilentAimEnabled = state
@@ -739,7 +753,7 @@ local SilentToggle = CombatTab:Toggle({
 })
 myConfig:Register("SilentAim", SilentToggle)
 
-
+-- Aim Part Dropdown
 local AimPartDropdown = CombatTab:Dropdown({
     Title = "Aim Part",
     Desc = "เลือกส่วนที่จะล็อค",
@@ -759,7 +773,7 @@ local AimPartDropdown = CombatTab:Dropdown({
 })
 myConfig:Register("AimPart", AimPartDropdown)
 
-
+-- FOV Slider
 local FOVSlider = CombatTab:Slider({
     Title = "FOV Radius",
     Step = 1,
@@ -777,10 +791,10 @@ local FOVSlider = CombatTab:Slider({
 })
 myConfig:Register("FOVRadius", FOVSlider)
 
-
+-- Show FOV Toggle
 local ShowFOVToggle = CombatTab:Toggle({
     Title = "Show FOV Circle",
-    Desc = "แสดงวงกลม FOV",
+    Desc = "แสดงวงกลม FOV บนหน้าจอ",
     Default = ShowFOV,
     Callback = function(state)
         ShowFOV = state
@@ -825,7 +839,7 @@ local FriendsDropdown = CombatTab:Dropdown({
 })
 myConfig:Register("FriendsList", FriendsDropdown)
 
--
+-- อัพเดท Friend List เมื่อมีคนเข้า/ออก
 Players.PlayerAdded:Connect(function()
     FriendsDropdown:SetValues(UpdateFriendList())
 end)
@@ -871,3 +885,9 @@ task.spawn(function()
     end
 end)
 
+-- ========== Notify ==========
+WindUI:Notify({
+    Title = "✅ Silent Aim Ready",
+    Description = "โหลด Silent Aim + ระบบ Ballistic เรียบร้อย",
+    Duration = 3
+})
