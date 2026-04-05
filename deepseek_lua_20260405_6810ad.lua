@@ -11,10 +11,10 @@ local LocalPlayer = Players.LocalPlayer
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "ULTIMATE SILENT AIM",
+    Title = "DNN HUB | Test | Demo",
     Icon = "",
     Author = "",
-    Folder = "ULTIMATE SA",
+    Folder = "",
     Size = UDim2.fromOffset(450, 480),
     Transparent = true,
     Resizable = true,
@@ -511,8 +511,8 @@ end
 local CombatTab = Window:Tab({Title = "SILENT AIM", Icon = "crosshair"})
 
 CombatTab:Toggle({
-    Title = "Ultimate Silent Aim",
-    Desc = "ล็อคเป้า + ทำนายล่วงหน้า + Wallbang",
+    Title = "Silent aim | Wallbang",
+    Desc = "ล็อคเป้า|ยิงทะลุ",
     Default = false,
     Callback = function(state)
         SilentAimEnabled = state
@@ -525,7 +525,7 @@ myConfig:Register("SilentAim", CombatTab.Toggle)
 
 CombatTab:Dropdown({
     Title = "Aim Part",
-    Desc = "เลือกส่วนที่จะล็อค (หัว = แดง, ตัว = เขียว)",
+    Desc = "เลือกส่วนที่จะล็อค",
     Values = {"Head", "Body"},
     Value = "Head",
     Callback = function(option)
@@ -590,6 +590,6 @@ end)
 
 WindUI:Notify({
     Title = "✅ Ultimate Silent Aim",
-    Description = "เลือกเพื่อนแบบ Dropdown ได้เลย",
+    Description = "",
     Duration = 3
 })
