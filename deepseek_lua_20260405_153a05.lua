@@ -842,27 +842,3 @@ WindUI:Notify({
     Description = "ระบบทำนายกระสุน Auto-Learning พร้อมใช้งาน",
     Duration = 3
 })
-
--- ========== Logo Toggle (กด T เปิด/ปิด GUI) ==========
-local LogoGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-LogoGui.Name = "PigHub_Logo"
-LogoGui.ResetOnSpawn = false
-LogoGui.DisplayOrder = 999
-
-local LogoBtn = Instance.new("ImageButton", LogoGui)
-LogoBtn.Size = UDim2.new(0, 55, 0, 55)
-LogoBtn.Position = UDim2.new(0, 12, 1, -70)
-LogoBtn.BackgroundTransparency = 1
-LogoBtn.Image = "rbxassetid://120437295686483"
-LogoBtn.Active = true
-LogoBtn.Draggable = true
-
-local function ToggleUI()
-    if Window.Toggle then Window:Toggle() else Window.UI.Enabled = not Window.UI.Enabled end
-end
-LogoBtn.MouseButton1Click:Connect(ToggleUI)
-
-local UserInputService = game:GetService("UserInputService")
-UserInputService.InputBegan:Connect(function(i, gp)
-    if not gp and i.KeyCode == Enum.KeyCode.T then ToggleUI() end
-end)
