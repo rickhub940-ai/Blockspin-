@@ -13,10 +13,10 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Silent Aim",
+    Title = "แก้ละ100%% | ควย",
     Icon = "",
     Author = "",
-    Folder = "ERROR HUB",
+    Folder = "",
     Size = UDim2.fromOffset(450, 520),
     Theme = "Dark",
     Transparent = true,
@@ -808,6 +808,6 @@ end)
 -- ========== Notify สำเร็จ ==========
 WindUI:Notify({
     Title = "✅ Silent Aim Complete",
-    Description = "เส้นกระสุนของเรา + ระบบยิง PIGHUB + Ballistics + Auto-Learning",
+    Description = "Ballistics Auto-Learning",
     Duration = 3
 })
