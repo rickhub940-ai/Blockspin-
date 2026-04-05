@@ -13,23 +13,23 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Silent Aim Ultra",
+    Title = "DNN HUB | Test | Demo |",
     Icon = "",
     Author = "",
-    Folder = "ERROR HUB",
+    Folder = "Dnn HUB",
     Size = UDim2.fromOffset(500, 500),
     Theme = "Dark",
     Transparent = true,
     Resizable = true,
 })
 
--- ========== Config Manager ==========
+
 local ConfigManager = Window.ConfigManager
 local myConfig = ConfigManager:CreateConfig("SilentAimUltraConfig")
 
--- ========== ตัวแปร Silent Aim ==========
+
 local SilentAimEnabled = false
-local ShowFOV = true
+local ShowFOV = false
 local FOV = 120
 local excludedPlayers = {}
 local AimPart = "Head"
@@ -632,8 +632,8 @@ end)
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
 
 local SilentToggle = CombatTab:Toggle({
-    Title = "Silent Aim Ultra",
-    Desc = "ล็อคเป้าหมาย + ทำนายกระสุน + กัน Anti-Look",
+    Title = "Silent Aim | Wallbang",
+    Desc = "",
     Default = false,
     Callback = function(state)
         SilentAimEnabled = state
@@ -675,7 +675,7 @@ myConfig:Register("FOVRadius", FOVSlider)
 
 local ShowFOVToggle = CombatTab:Toggle({
     Title = "Show FOV Circle",
-    Desc = "แสดงวงกลม FOV บนหน้าจอ",
+    Desc = "แสดงวง",
     Default = ShowFOV,
     Callback = function(state)
         ShowFOV = state
@@ -771,7 +771,7 @@ task.spawn(function()
 end)
 
 WindUI:Notify({
-    Title = "✅ Silent Aim Ultra Ready",
-    Description = "กัน Anti-Look + ปรับค่าอัตโนมัติ เรียบร้อย",
+    Title = "✅ Dnn HUB Ultra Ready",
+    Description = "FUCK",
     Duration = 3
 })
