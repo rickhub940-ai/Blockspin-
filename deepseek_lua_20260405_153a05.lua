@@ -8,10 +8,10 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== สร้าง GUI Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "PIG HUB | BALLISTICS",
-    Icon = "rbxassetid://120437295686483",
-    Author = "PIG TEAM",
-    Folder = "PIG HUB",
+    Title = "DNN HUB | BALLISTICS",
+    Icon = "",
+    Author = "",
+    Folder = "",
     Size = UDim2.fromOffset(620, 550),
     MinSize = Vector2.new(580, 450),
     MaxSize = Vector2.new(900, 650),
@@ -835,33 +835,6 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 RunService.Heartbeat:Connect(UpdateExcludedHighlights)
 
--- ========== หน้า Info ==========
-local InfoTab = Window:Tab({Title = "ℹ️ INFO", Icon = "info"})
-
-InfoTab:Paragraph({
-    Title = "PIG HUB | BALLISTICS SYSTEM",
-    Text = [[
-✅ Silent Aim + Wallbang
-✅ Auto-Learning Bullet Physics
-✅ Real-time Prediction
-✅ FOV Circle + Tracer + Target Dot
-✅ Safe Friend List
-    ]]
-})
-
-InfoTab:Button({
-    Title = "📋 Copy Current Values",
-    Callback = function()
-        local text = string.format("Speed: %.0f | Gravity: %.1f | Prediction: %.2f", 
-            PROJECTILE_SPEED, GRAVITY, PREDICTION_STRENGTH)
-        setclipboard(text)
-        WindUI:Notify({
-            Title = "Copied!",
-            Description = text,
-            Duration = 2
-        })
-    end
-})
 
 -- ========== Notify สำเร็จ ==========
 WindUI:Notify({
