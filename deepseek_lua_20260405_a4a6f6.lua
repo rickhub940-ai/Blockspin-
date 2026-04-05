@@ -13,10 +13,10 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 
 -- ========== ตั้งค่า Window ==========
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Silent Aim",
+    Title = "DNN HUB | Test| V 2.1",
     Icon = "",
     Author = "",
-    Folder = "ERROR HUB",
+    Folder = "DNN HUB",
     Size = UDim2.fromOffset(450, 520),
     Theme = "Dark",
     Transparent = true,
@@ -29,7 +29,7 @@ local myConfig = ConfigManager:CreateConfig("SilentAimConfig")
 
 -- ========== ตัวแปร Silent Aim ==========
 local SilentAimEnabled = false
-local ShowFOV = true
+local ShowFOV = false
 local FOV = 200
 local excludedPlayerNames = {}
 local AimPart = "Head"
@@ -631,7 +631,7 @@ local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
 -- Silent Aim Toggle
 local SilentToggle = CombatTab:Toggle({
     Title = "Silent Aim | Wallbang",
-    Desc = "ล็อคเป้าอัตโนมัติ + ยิงทะลุกำแพง + Auto-Learning วิถีกระสุน",
+    Desc = "ล็อคเป้า|ยิงทุละ😈",
     Default = false,
     Callback = function(state)
         SilentAimEnabled = state
