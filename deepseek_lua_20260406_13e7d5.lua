@@ -1,3 +1,17 @@
+
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local Window = WindUI:CreateWindow({
+    Title = "Dnn HUB | Test Silent Aim",
+    Icon = "",
+    Author = "",
+    Folder = "",
+    Size = UDim2.fromOffset(420, 350),
+    Theme = "Dark",
+    Transparent = true,
+    Resizable = true,
+})
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,6 +21,10 @@ local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 local Stats = game:GetService("Stats")
 local Camera = workspace.CurrentCamera
+
+
+
+
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -573,18 +591,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     CreateDrawingObjects()
 end)
 
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
-local Window = WindUI:CreateWindow({
-    Title = "Dnn HUB | Test Silent Aim",
-    Icon = "",
-    Author = "",
-    Folder = "",
-    Size = UDim2.fromOffset(420, 350),
-    Theme = "Dark",
-    Transparent = true,
-    Resizable = true,
-})
 
 local CombatTab = Window:Tab({Title = "Silent Aim", Icon = "crosshair"})
 
