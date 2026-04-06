@@ -576,10 +576,10 @@ end)
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB | Silent Aim",
+    Title = "Dnn HUB | Test Silent Aim",
     Icon = "",
     Author = "",
-    Folder = "ERROR HUB",
+    Folder = "",
     Size = UDim2.fromOffset(420, 350),
     Theme = "Dark",
     Transparent = true,
