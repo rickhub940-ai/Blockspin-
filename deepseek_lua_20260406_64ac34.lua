@@ -432,10 +432,10 @@ end)
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 
 local Window = WindUI:CreateWindow({
-    Title = "PIG HUB | Silent Aim",
+    Title = "DnnHUB | Silent Aim",
     Icon = "",
     Author = "",
-    Folder = "PigHubSilentAim",
+    Folder = "",
     Size = UDim2.fromOffset(400, 320),
     Theme = "Dark",
     Transparent = true,
@@ -445,8 +445,7 @@ local Window = WindUI:CreateWindow({
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "crosshair"})
 
 CombatTab:Toggle({
-    Title = "Silent Aim",
-    Desc = "ระบบเล็งของ PigHub 100%",
+    Title = "Silent Aim | wallbang",
     Default = false,
     Callback = function(state)
         SilentAimEnabled = state
