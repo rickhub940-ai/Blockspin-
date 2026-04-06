@@ -230,6 +230,244 @@ LocalPlayer.CharacterAdded:Connect(function()
     CreateDrawingObjects()
 end)
 
+
+
+
+-- Esp
+
+-- ================================
+-- 🔥 FULL ESP SYSTEM (ALL-IN-ONE)
+-- ================================
+
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Dropped = Workspace:WaitForChild("DroppedItems")
+
+local ESP = {}
+local BillboardCache = {}
+
+-- 🔘 SETTINGS
+local ESPSettings = {
+    Enabled = true,
+    ShowName = true,
+    ShowDistance = true,
+    ShowHealth = true,
+    ShowItems = true,
+    ShowDropped = true
+}
+
+-- 🎨 COLORS
+local RARITY_COLORS = {
+    Common = Color3.fromRGB(200,200,200),
+    Uncommon = Color3.fromRGB(86,176,62),
+    Rare = Color3.fromRGB(0,162,255),
+    Epic = Color3.fromRGB(170,85,255),
+    Legendary = Color3.fromRGB(255,170,0),
+    Omega = Color3.fromRGB(255,75,75)
+}
+
+-- =====================
+-- 🎨 HEALTH COLOR
+-- =====================
+local function getHealthColor(p)
+    if p > 0.5 then
+        return Color3.new((1-p)*2,1,0)
+    else
+        return Color3.new(1,p*2,0)
+    end
+end
+
+-- =====================
+-- 👤 PLAYER ESP
+-- =====================
+local function removeESP(player)
+    if ESP[player] then
+        ESP[player].Bill:Destroy()
+        ESP[player] = nil
+    end
+end
+
+local function createESP(player,char)
+    if player == LocalPlayer then return end
+    removeESP(player)
+
+    local head = char:WaitForChild("Head")
+    local hum = char:WaitForChild("Humanoid")
+    local root = char:WaitForChild("HumanoidRootPart")
+
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0,100,0,25)
+    bill.StudsOffset = Vector3.new(0,2.8,0)
+    bill.Adornee = head
+    bill.AlwaysOnTop = true
+    bill.Parent = CoreGui
+
+    local label = Instance.new("TextLabel", bill)
+    label.Size = UDim2.new(1,0,0,14)
+    label.BackgroundTransparency = 1
+    label.TextScaled = true
+    label.Font = Enum.Font.GothamBold
+    label.TextStrokeTransparency = 0
+
+    local bg = Instance.new("Frame", bill)
+    bg.Size = UDim2.new(1,0,0,6)
+    bg.BackgroundColor3 = Color3.fromRGB(25,25,25)
+    bg.BorderSizePixel = 0
+    Instance.new("UICorner",bg).CornerRadius = UDim.new(1,0)
+
+    local bar = Instance.new("Frame",bg)
+    bar.Size = UDim2.new(1,0,1,0)
+    Instance.new("UICorner",bar).CornerRadius = UDim.new(1,0)
+
+    RunService.RenderStepped:Connect(function()
+        if not char.Parent then return end
+        bill.Enabled = ESPSettings.Enabled
+        if not ESPSettings.Enabled then return end
+
+        -- 📏 distance
+        local dist = 0
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
+        end
+        dist = math.floor(dist)
+
+        -- 🧾 text logic
+        local text = ""
+        if ESPSettings.ShowName and ESPSettings.ShowDistance then
+            text = player.Name.." | "..dist.."m"
+        elseif ESPSettings.ShowName then
+            text = player.Name
+        elseif ESPSettings.ShowDistance then
+            text = dist.."m"
+        end
+        label.Text = text
+
+        -- 📍 position
+        if ESPSettings.ShowHealth then
+            label.Position = UDim2.new(0,0,0,0)
+            bg.Position = UDim2.new(0,0,0,16)
+        else
+            label.Position = UDim2.new(0,0,0,4)
+            bg.Visible = false
+        end
+
+        -- ❤️ health
+        if ESPSettings.ShowHealth then
+            local p = hum.Health/hum.MaxHealth
+            bar.Size = UDim2.new(p,0,1,0)
+            bar.BackgroundColor3 = getHealthColor(p)
+            bg.Visible = true
+        end
+    end)
+
+    ESP[player] = {Bill=bill}
+end
+
+-- =====================
+-- 🎒 ITEMS ESP (PLAYER)
+-- =====================
+local function updateItems(player)
+    if not ESPSettings.ShowItems then
+        if BillboardCache[player] then
+            BillboardCache[player]:Destroy()
+            BillboardCache[player] = nil
+        end
+        return
+    end
+
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    if BillboardCache[player] then
+        BillboardCache[player]:Destroy()
+    end
+
+    local bill = Instance.new("BillboardGui")
+    bill.Size = UDim2.new(0,100,0,20)
+    bill.StudsOffset = Vector3.new(0,-4,0)
+    bill.Adornee = root
+    bill.AlwaysOnTop = true
+    bill.Parent = root
+
+    local layout = Instance.new("UIListLayout",bill)
+    layout.FillDirection = Enum.FillDirection.Horizontal
+
+    local function add(container)
+        if container then
+            for _,t in ipairs(container:GetChildren()) do
+                if t:IsA("Tool") then
+                    local img = Instance.new("TextLabel",bill)
+                    img.Size = UDim2.new(0,20,0,20)
+                    img.Text = "■"
+                    img.TextScaled = true
+                end
+            end
+        end
+    end
+
+    add(player:FindFirstChild("Backpack"))
+    add(char)
+
+    BillboardCache[player] = bill
+end
+
+-- =====================
+-- 💎 DROPPED ESP
+-- =====================
+local function highlightItem(item)
+    if not ESPSettings.ShowDropped then return end
+    if item:FindFirstChild("ESP_Highlight") then return end
+
+    local hl = Instance.new("Highlight")
+    hl.Name = "ESP_Highlight"
+    hl.Adornee = item
+    hl.FillTransparency = 0.6
+    hl.Parent = item
+end
+
+local function clearItem(item)
+    local hl = item:FindFirstChild("ESP_Highlight")
+    if hl then hl:Destroy() end
+end
+
+-- =====================
+-- 👥 PLAYERS
+-- =====================
+for _,p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        if p.Character then createESP(p,p.Character) end
+        p.CharacterAdded:Connect(function(c)
+            createESP(p,c)
+            updateItems(p)
+        end)
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(c)
+        createESP(p,c)
+        updateItems(p)
+    end)
+end)
+
+Players.PlayerRemoving:Connect(removeESP)
+
+-- =====================
+-- 💎 DROPPED EVENTS
+-- =====================
+Dropped.ChildAdded:Connect(function(item)
+    task.wait(0.1)
+    highlightItem(item)
+end)
+
+Dropped.ChildRemoved:Connect(clearItem)
 -- UI
 local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
 local Window = WindUI:CreateWindow({
@@ -287,3 +525,53 @@ CombatTab:Input({
     end
 })
 
+local toggleESPTab = Window:Tab({Title = "ESp", Icon = "eye"})
+
+
+toggleESPTab:Toggle({
+    Title = "ESP",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.Enabled = v
+    end
+})
+
+toggleESPTab:Toggle({
+    Title = "Esp Name",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.ShowName = v
+    end
+})
+
+toggleESPTab:Toggle({
+    Title = "Esp Distance",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.ShowDistance = v
+    end
+})
+
+toggleESPTab:Toggle({
+    Title = "Esp Health",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.ShowHealth = v
+    end
+})
+
+toggleESPTab:Toggle({
+    Title = "Esp Items",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.ShowItems = v
+    end
+})
+
+toggleESPTab:Toggle({
+    Title = "Esp items Dropped",
+    Default = true,
+    Callback = function(v)
+        ESPSettings.ShowDropped = v
+    end
+})
