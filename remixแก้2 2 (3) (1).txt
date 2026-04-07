@@ -38,12 +38,12 @@ local WindUI = loadstring(game:HttpGet(
 ))()
 
 local Window = WindUI:CreateWindow({
-    Title = "ERROR HUB",
+    Title = "DNN HUB | Test",
     Icon = "rbxassetid://108455308252343", 
     Author = "",
     Folder = "ERROR HUB",
     Size = UDim2.fromOffset(450, 330),
-    Theme = "Violet", 
+    Theme = "Dark", 
     Transparent = true,
     Resizable = true,
 })
