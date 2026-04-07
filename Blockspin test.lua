@@ -11,12 +11,12 @@ local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
 ..player.UserId.."&size=420x420&format=Png"
 
 local Window = WindUI:CreateWindow({
-    Title = "RICK HUB [ BLOCK SPIN] ",
+    Title = "Dipper HUB [ BLOCK SPIN] ",
     Icon = "rbxassetid://108958018844079",
     Author = "Author[ 009.exe ]",
     Folder = "DNN HUB",
     Size = UDim2.fromOffset(730, 410),
-    Theme = "XenonReal",
+    Theme = "Light",
     Transparent = true,
     Resizable = true,
 
