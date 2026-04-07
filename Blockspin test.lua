@@ -650,14 +650,78 @@ if LocalPlayer.Character then setupWalkSpeed(LocalPlayer.Character) end
 
 -- Jumppower  local
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
 
 local jumpEnabled = false
 local jumpPower = 70
 local jumpConnection = nil
+
+
+
+-- อินฟิตี้สตามมิน่า
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local infiniteStaminaEnabled = false
+local staminaHeartbeatConn = nil
+local originalSprintBarUpdate = nil
+
+task.spawn(function()
+    pcall(function()
+        local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+        local func = debug.getupvalue(NetModule.get, 2)
+        debug.setconstant(func, 3, '__Bypass')
+        debug.setconstant(func, 4, '__Bypass')
+    end)
+end)
+
+local function EnableInfiniteStamina()
+    if infiniteStaminaEnabled then return end
+    pcall(function()
+        local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+        local SprintModule = require(ReplicatedStorage.Modules.Game.Sprint)
+        staminaHeartbeatConn = RunService.Heartbeat:Connect(function()
+            NetModule.send("set_sprinting_1", true)
+        end)
+        local consume_stamina = SprintModule.consume_stamina
+        local SprintBar = debug.getupvalue(consume_stamina, 2).sprint_bar
+        originalSprintBarUpdate = SprintBar.update
+        SprintBar.update = function(...)
+            if infiniteStaminaEnabled then
+                return originalSprintBarUpdate(function() return 0.5 end)
+            end
+            return originalSprintBarUpdate(...)
+        end
+    end)
+    infiniteStaminaEnabled = true
+end
+
+local function DisableInfiniteStamina()
+    if not infiniteStaminaEnabled then return end
+    pcall(function()
+        local SprintModule = require(ReplicatedStorage.Modules.Game.Sprint)
+        local consume_stamina = SprintModule.consume_stamina
+        local SprintBar = debug.getupvalue(consume_stamina, 2).sprint_bar
+        if originalSprintBarUpdate then
+            SprintBar.update = originalSprintBarUpdate
+            originalSprintBarUpdate = nil
+        end
+        if staminaHeartbeatConn then
+            staminaHeartbeatConn:Disconnect()
+            staminaHeartbeatConn = nil
+        end
+    end)
+    infiniteStaminaEnabled = false
+end
+
+local function ToggleInfiniteStamina(state)
+    if state then
+        EnableInfiniteStamina()
+    else
+        DisableInfiniteStamina()
+    end
+end
+
 
 
 
@@ -847,6 +911,13 @@ ChaterTab:Slider({
     Value = {Min = 20, Max = 150, Default = 70}, 
     Callback = function(v) 
         jumpPower = v 
+    end
+})
+ChaterTab:Toggle({
+    Title = "อินฟินิตี้สตามินา",
+    Default = false,
+    Callback = function(state)
+        ToggleInfiniteStamina(state)
     end
 })
 
