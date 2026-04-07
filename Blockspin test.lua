@@ -5,55 +5,7 @@ local WindUI = loadstring(game:HttpGet(
 local player = game.Players.LocalPlayer
 
 
---// COLORS (เทาใส)
-local DARK1 = Color3.fromHex("#1E1E1E")
-local DARK2 = Color3.fromHex("#2A2A2A")
-local DARK3 = Color3.fromHex("#242424")
-local WHITE = Color3.fromHex("#FFFFFF")
 
---// GRADIENT (เรียบมาก)
-local BG = WindUI:Gradient({
-    ["0"] = {Color = DARK1, Transparency = 0.25},
-    ["100"] = {Color = DARK2, Transparency = 0.25},
-},{Rotation = 90})
-
-local TAB = WindUI:Gradient({
-    ["0"] = {Color = DARK2, Transparency = 0.1},
-    ["100"] = {Color = DARK3, Transparency = 0.1},
-},{Rotation = 90})
-
---// THEME
-WindUI:AddTheme({
-    Name = "XenonReal",
-
-    Accent = WHITE, -- ไม่มีสีจัด
-    Hover = WHITE,
-
-    Background = BG,
-    BackgroundTransparency = 0.35,
-
-    Outline = Color3.fromRGB(255,255,255),
-    OutlineTransparency = 0.92, -- จางมาก
-
-    Text = WHITE,
-    Icon = WHITE,
-
-    WindowBackground = BG,
-    WindowShadow = Color3.fromRGB(0,0,0),
-
-    TabBackground = TAB,
-    TabTitle = WHITE,
-    TabIcon = WHITE,
-
-    ElementBackground = TAB,
-    ElementTitle = WHITE,
-
-    Button = TAB,
-    Toggle = TAB,
-    Slider = TAB,
-})
-
-WindUI:SetTheme("XenonReal")
 
 local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
 ..player.UserId.."&size=420x420&format=Png"
@@ -670,7 +622,7 @@ end)
 
 
 
-local CombatTab = Window:Tab({Title = "COMBAT", Icon = "user"})
+local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
 
@@ -804,3 +756,8 @@ local ItemsESPToggle = EspTab:Toggle({
         end
     end
 })
+
+
+
+
+local ChaterTab = Window:Tab({Title = "Character", Icon = "user"})
