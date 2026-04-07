@@ -620,6 +620,45 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 
+-- Walkspeed
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local walkSpeedEnabled = false
+local speedValue = 0.5
+local moveConnection = nil
+
+local function setupWalkSpeed(char)
+    if moveConnection then pcall(function() moveConnection:Disconnect() end) end
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not hrp or not humanoid then return end
+    moveConnection = RunService.Heartbeat:Connect(function(dt)
+        if walkSpeedEnabled and char and hrp and humanoid and humanoid.Health > 0 then
+            if humanoid.MoveDirection.Magnitude > 0 then
+                hrp.CFrame = hrp.CFrame + (humanoid.MoveDirection.Unit * speedValue)
+            end
+        end
+    end)
+end
+LocalPlayer.CharacterAdded:Connect(function(char) task.wait(0.5) setupWalkSpeed(char) end)
+if LocalPlayer.Character then setupWalkSpeed(LocalPlayer.Character) end
+
+
+-- Jumppower  local
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local jumpEnabled = false
+local jumpPower = 70
+local jumpConnection = nil
+
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
@@ -761,3 +800,51 @@ local ItemsESPToggle = EspTab:Toggle({
 
 
 local ChaterTab = Window:Tab({Title = "Character", Icon = "user"})
+
+
+
+ChaterTab:Toggle({
+    Title = "walk speed", 
+    Default = false, 
+    Callback = function(state) 
+        walkSpeedEnabled = state 
+    end
+})
+
+ChaterTab:Slider({
+    Title = "speed", 
+    Step = 0.1, 
+    Value = {Min = 0.1, Max = 5, Default = 0.5}, 
+    Callback = function(v) 
+        speedValue = v 
+    end
+})
+
+
+ChaterTab:Toggle({
+    Title = "jump power", 
+    Default = false, 
+    Callback = function(state)
+        jumpEnabled = state
+        if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
+        if state then
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, jumpPower, char.HumanoidRootPart.Velocity.Z)
+                end
+            end)
+        end
+    end
+})
+
+ChaterTab:Slider({
+    Title = "jump valu", 
+    Step = 5, 
+    Value = {Min = 20, Max = 150, Default = 70}, 
+    Callback = function(v) 
+        jumpPower = v 
+    end
+})
+
