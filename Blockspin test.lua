@@ -801,7 +801,9 @@ local ItemsESPToggle = EspTab:Toggle({
 
 local ChaterTab = Window:Tab({Title = "Character", Icon = "user"})
 
+ChaterTab:Divider()
 
+ChaterTab:Section({Title = "Body"})
 
 ChaterTab:Toggle({
     Title = "walk speed", 
@@ -848,3 +850,5 @@ ChaterTab:Slider({
     end
 })
 
+ChaterTab:Divider()
+ChaterTab:Section({Title = ""})
