@@ -1583,15 +1583,15 @@ local function getBankMoney()
     return success and value or 0
 end
 
-PlayerTab:Section({ Title = "Dashboard" })
 
-local BankBalance = PlayerTab:Button({
+
+local BankBalance = FarmTab:Button({
     Title = "Money in Bank",
     Desc = "<b>$0</b>",
     Callback = function() end
 })
 
-local HandBalance = PlayerTab:Button({
+local HandBalance = FarmTab:Button({
     Title = "Money player",
     Desc = "<b>$0</b>",
     Callback = function() end
