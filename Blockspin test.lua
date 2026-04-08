@@ -1532,6 +1532,82 @@ ChaterTab:Section({Title = ""})
 
 local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local function formatMoney(amount)
+    amount = tonumber(amount) or 0
+    if amount >= 1e6 then
+        return string.format("$%.1fM", amount / 1e6)
+    elseif amount >= 1e3 then
+        return string.format("$%.1fK", amount / 1e3)
+    else
+        return string.format("$%d", amount)
+    end
+end
+
+local function greenText(text)
+    return string.format('<font color="#00C853"><b>%s</b></font>', text)
+end
+
+local function getHandMoney()
+    local success, value = pcall(function()
+        local gui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not gui then return 0 end
+        local hud = gui:FindFirstChild("TopRightHud")
+        if not hud then return 0 end
+        local holder = hud:FindFirstChild("Holder")
+        if not holder then return 0 end
+        local frame = holder:FindFirstChild("Frame")
+        if not frame then return 0 end
+        local label = frame:FindFirstChild("MoneyTextLabel")
+        if not label then return 0 end
+        return tonumber(label.Text:gsub("[$,]", "")) or 0
+    end)
+    return success and value or 0
+end
+
+local function getBankMoney()
+    local success, value = pcall(function()
+        local gui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not gui then return 0 end
+        for _, v in ipairs(gui:GetDescendants()) do
+            if v:IsA("TextLabel") then
+                if v.Text:find("Bank") or v.Text:find("Balance") then
+                    local num = v.Text:gsub("[$,]", ""):gsub("Bank", ""):gsub("Balance", ""):gsub(":", ""):match("%d+")
+                    return tonumber(num) or 0
+                end
+            end
+        end
+        return 0
+    end)
+    return success and value or 0
+end
+
+PlayerTab:Section({ Title = "Dashboard" })
+
+local BankBalance = PlayerTab:Button({
+    Title = "Money in Bank",
+    Desc = "<b>$0</b>",
+    Callback = function() end
+})
+
+local HandBalance = PlayerTab:Button({
+    Title = "Money player",
+    Desc = "<b>$0</b>",
+    Callback = function() end
+})
+task.spawn(function()
+    while true do
+        local hand = getHandMoney()
+        local bank = getBankMoney()
+        HandBalance:SetDesc(greenText(formatMoney(hand)))
+        BankBalance:SetDesc(greenText(formatMoney(bank)))
+        task.wait(0.2)
+    end
+end)
+
+FarmTab:Divider()
+
 FarmTab:Toggle({
     Title = "Auto Farm Janitor 🪣🧹",
     Desc = "",
