@@ -967,6 +967,340 @@ local jumpConnection = nil
 
 
 
+
+-- Farm ถูพื้นกากๆ
+
+
+
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService("GuiService")
+local VIM = game:GetService("VirtualInputManager")
+local TweenService = game:GetService("TweenService")
+
+local plr = Players.LocalPlayer
+local char = plr.Character or plr.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local hum = char:WaitForChild("Humanoid")
+
+local Janitor = require(ReplicatedStorage.Modules.Game.Jobs.Janitor)
+local JobUtil = require(ReplicatedStorage.Modules.Game.Jobs.JobUtil)
+
+local JanitorSettings = {
+    Enabled = false,
+}
+
+local CONFIG = {
+    JobPositions = {
+        Vector3.new(109.13, 257.80, -243.59),
+        Vector3.new(110.61, 255.21, -309.56)
+    },
+    WalkSpeed = 25,
+    AgentRadius = 2.5,
+    AgentHeight = 5,
+    WaypointSpacing = 2,
+    StuckThreshold = 2.5,
+    StuckDistance = 0.2,
+    RecomputeInterval = 3.5,
+    ObstacleDistance = 5.5,
+    JumpCooldown = 0.8,
+    WaypointReachDistance = 4,
+}
+local targetAnchor = Instance.new("Part")
+targetAnchor.Transparency, targetAnchor.CanCollide, targetAnchor.Anchored = 1, false, true
+targetAnchor.Name = "AI_Target"
+targetAnchor.Parent = workspace
+local arrowInstance = nil
+local currentJobIndex = 1
+local isRunning = false
+
+local AIState = {
+    lastPos = Vector3.new(),
+    stuckTimer = 0,
+    recomputeTimer = 0,
+    lastJumpTime = 0,
+    waypoints = {},
+    wpIndex = 1,
+}
+local function hasJob()
+    local job = plr:GetAttribute("Job")
+    return job ~= nil and job ~= ""
+end
+
+local function equipMop()
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and (string.find(tool.Name:lower(), "mop") or tool:HasTag("Mop")) then 
+        return true 
+    end
+    local bpTool = plr.Backpack:FindFirstChild("Mop") or plr.Backpack:FindFirstChildOfClass("Tool")
+    if bpTool and (string.find(bpTool.Name:lower(), "mop") or bpTool:HasTag("Mop")) then
+        hum:EquipTool(bpTool)
+        return true
+    end
+    return false
+end
+
+local function isDoor(inst)
+    if not inst or not inst:IsA("BasePart") then return false end
+    local name = inst.Name:lower()
+    if name:find("door") or name:find("gate") or name:find("entrance") then return true end
+    local parent = inst.Parent
+    if parent and parent.Name and parent.Name:lower():find("door") then return true end
+    return false
+end
+
+local lastObstacleTime = 0
+local function hasObstacleAhead()
+    local now = tick()
+    if now - lastObstacleTime < 0.08 then return false end
+    lastObstacleTime = now
+    
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {char, targetAnchor}
+    
+    local lookDir = hrp.CFrame.LookVector
+    local hit = workspace:Raycast(hrp.Position, lookDir * CONFIG.ObstacleDistance, rayParams)
+    
+    if hit and hit.Instance and hit.Instance.CanCollide and not isDoor(hit.Instance) then
+        local name = hit.Instance.Name:lower()
+        if name ~= "baseplate" and name ~= "ground" and name ~= "floor" then
+            return true, hit.Instance, hit.Position
+        end
+    end
+    return false, nil, nil
+end
+
+local function getAvoidanceDirection()
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {char, targetAnchor}
+    
+    local right = hrp.CFrame.RightVector
+    local left = -right
+    
+    local rightHit = workspace:Raycast(hrp.Position, right * 4, rayParams)
+    local leftHit = workspace:Raycast(hrp.Position, left * 4, rayParams)
+    
+    local canGoRight = not rightHit or not rightHit.Instance.CanCollide or isDoor(rightHit.Instance)
+    local canGoLeft = not leftHit or not leftHit.Instance.CanCollide or isDoor(leftHit.Instance)
+    
+    if canGoRight and canGoLeft then
+        return (math.random() > 0.5 and right or left)
+    elseif canGoRight then
+        return right
+    elseif canGoLeft then
+        return left
+    else
+        if tick() - AIState.lastJumpTime > CONFIG.JumpCooldown then
+            hum.Jump = true
+            AIState.lastJumpTime = tick()
+        end
+        return -hrp.CFrame.LookVector
+    end
+end
+
+local function updatePath(targetPos)
+    local path = PathfindingService:CreatePath({
+        AgentRadius = CONFIG.AgentRadius,
+        AgentHeight = CONFIG.AgentHeight,
+        AgentCanJump = true,
+        WaypointSpacing = CONFIG.WaypointSpacing
+    })
+    
+    local success = pcall(function()
+        path:ComputeAsync(hrp.Position, targetPos)
+    end)
+    
+    if success and path.Status == Enum.PathStatus.Success then
+        local waypoints = path:GetWaypoints()
+        if #waypoints > 0 then
+            AIState.waypoints = waypoints
+            AIState.wpIndex = 1
+            return true
+        end
+    end
+    
+    AIState.waypoints = {{Position = targetPos}}
+    AIState.wpIndex = 1
+    return false
+end
+
+local function moveToTarget(targetInstance, isPuddle)
+    local targetPos = (typeof(targetInstance) == "Vector3") and targetInstance or targetInstance:GetPivot().Position
+    
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item:IsA("BasePart") and isDoor(item) then
+            item.CanQuery = false
+        end
+    end
+    
+    local originalSpeed = hum.WalkSpeed
+    hum.WalkSpeed = CONFIG.WalkSpeed
+    
+    updatePath(targetPos)
+    
+    targetAnchor.Position = targetPos
+    if arrowInstance then arrowInstance:Destroy() end
+    arrowInstance = JobUtil.create_arrow(hrp, targetAnchor)
+    
+    AIState.lastPos = hrp.Position
+    AIState.stuckTimer = 0
+    AIState.recomputeTimer = 0
+    
+    while AIState.wpIndex <= #AIState.waypoints and hum.Health > 0 and JanitorSettings.Enabled do
+        local waypointPos = AIState.waypoints[AIState.wpIndex].Position
+        
+        local hasObs = hasObstacleAhead()
+        
+        if hasObs then
+            local avoidDir = getAvoidanceDirection()
+            local avoidPos = hrp.Position + avoidDir * 3.5
+            hum:MoveTo(avoidPos)
+        else
+            hum:MoveTo(waypointPos)
+        end
+        
+        AIState.recomputeTimer = AIState.recomputeTimer + 0.2
+        if AIState.recomputeTimer > CONFIG.RecomputeInterval then
+            updatePath(targetPos)
+            AIState.recomputeTimer = 0
+        end
+        
+        local distMoved = (hrp.Position - AIState.lastPos).Magnitude
+        if distMoved < CONFIG.StuckDistance then
+            AIState.stuckTimer = AIState.stuckTimer + 0.2
+            if AIState.stuckTimer > CONFIG.StuckThreshold then
+                hum:MoveTo(hrp.Position + hrp.CFrame.LookVector * 2 + hrp.CFrame.RightVector * (math.random() - 0.5) * 3)
+                task.wait(0.15)
+                updatePath(targetPos)
+                AIState.stuckTimer = 0
+            end
+        else
+            AIState.stuckTimer = math.max(0, AIState.stuckTimer - 0.2)
+        end
+        AIState.lastPos = hrp.Position
+        
+        if (hrp.Position - waypointPos).Magnitude < CONFIG.WaypointReachDistance then
+            AIState.wpIndex = AIState.wpIndex + 1
+        end
+        
+        task.wait()
+    end
+    
+    if isPuddle and (hrp.Position - targetPos).Magnitude < 6 then
+        local tween = TweenService:Create(hrp, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+            CFrame = CFrame.new(targetPos.X, hrp.Position.Y, targetPos.Z)
+        })
+        tween:Play()
+        task.wait(0.25)
+    end
+    
+    hum.WalkSpeed = originalSpeed
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item:IsA("BasePart") and isDoor(item) then
+            item.CanQuery = true
+        end
+    end
+    if arrowInstance then
+        arrowInstance:Destroy()
+        arrowInstance = nil
+    end
+end
+
+local function autoApplyJob()
+    if hasJob() then return end
+    
+    local jobGui = plr.PlayerGui:FindFirstChild("JobApplication")
+    if jobGui and jobGui.Enabled then
+        local frame = jobGui:FindFirstChild("JobApplicationFrame") or jobGui:FindFirstChild("Frame")
+        local btn = frame and (frame:FindFirstChild("ApplyJob") or frame:FindFirstChild("Apply"))
+        
+        if frame and frame.Visible and btn and btn.Visible then
+            pcall(function()
+                btn.Selectable = true
+                GuiService.SelectedObject = btn
+                task.wait(0.1)
+                VIM:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+                task.wait(0.05)
+                VIM:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+            end)
+            task.wait(1.5)
+        end
+    end
+end
+
+local function goToJobPosition()
+    local targetPos = CONFIG.JobPositions[currentJobIndex]
+    moveToTarget(targetPos, false)
+    
+    currentJobIndex = currentJobIndex + 1
+    if currentJobIndex > #CONFIG.JobPositions then
+        currentJobIndex = 1
+    end
+end
+
+local function farmPuddles()
+    if not equipMop() then
+        task.wait(2)
+        return
+    end
+    
+    local closest, minDist = nil, math.huge
+    for _, puddle in pairs(Janitor.class.objects) do
+        if puddle and puddle.instance and not puddle.states.mopped.get() then
+            local dist = (puddle.instance.Position - hrp.Position).Magnitude
+            if dist < minDist then
+                minDist = dist
+                closest = puddle
+            end
+        end
+    end
+    
+    if closest then
+        moveToTarget(closest.instance, true)
+        local mopTime = closest.states.mop_length.get() or 3
+        task.wait(mopTime + 0.3)
+    else
+        task.wait(1)
+    end
+end
+
+-- ========== MAIN LOOP ==========
+local function startAutoFarm()
+    if isRunning then return end
+    isRunning = true
+    
+    while JanitorSettings.Enabled do
+        task.wait(0.3)
+        
+        char = plr.Character or plr.CharacterAdded:Wait()
+        hrp = char:WaitForChild("HumanoidRootPart")
+        hum = char:WaitForChild("Humanoid")
+        
+        if hum.Health <= 0 then
+            task.wait(3)
+            continue
+        end
+        
+        autoApplyJob()
+        
+        if not hasJob() then
+            goToJobPosition()
+        elseif plr:GetAttribute("Job") == "janitor" then
+            farmPuddles()
+        else
+            task.wait(2)
+        end
+    end
+    
+    isRunning = false
+end
+
+
+
+
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
@@ -1180,3 +1514,25 @@ end
 
 ChaterTab:Divider()
 ChaterTab:Section({Title = ""})
+
+
+
+
+
+
+
+
+local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
+
+FarmTab:Toggle({
+    Title = "Auto Farm Janitor 🪣🧹",
+    Desc = "",
+    Default = false,
+    Callback = function(state)
+        JanitorSettings.Enabled = state
+        if state then
+            task.spawn(startAutoFarm)
+        end
+    end
+})
+
