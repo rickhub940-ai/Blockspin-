@@ -318,7 +318,7 @@ local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
 
 local Window = WindUI:CreateWindow({
     Title = "Dipper HUB [ BLOCK SPIN] ",
-    Icon = "rbxassetid://108958018844079",
+    Icon = "rbxassetid://124339558110081",
     Author = "Author[ 009.exe ]",
     Folder = "DNN HUB",
     Size = UDim2.fromOffset(730, 410),
@@ -358,7 +358,7 @@ ScreenGui.Parent = CoreGui
 ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
 ToggleBtn.Position = UDim2.new(0, 20, 0.5, -25)
 ToggleBtn.BackgroundTransparency = 1
-ToggleBtn.Image = "rbxassetid://108958018844079"
+ToggleBtn.Image = "rbxassetid://124339558110081"
 ToggleBtn.Active = true
 ToggleBtn.Draggable = true
 ToggleBtn.Parent = ScreenGui
