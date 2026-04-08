@@ -345,7 +345,6 @@ Window:Tag({
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 
-
 Window:EditOpenButton({ Enabled = false })
 
 local ScreenGui = Instance.new("ScreenGui")
@@ -362,6 +361,16 @@ ToggleBtn.Image = "rbxassetid://124339558110081"
 ToggleBtn.Active = true
 ToggleBtn.Draggable = true
 ToggleBtn.Parent = ScreenGui
+
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = ToggleBtn
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(255,255,255)
+UIStroke.Parent = ToggleBtn
 
 local opened = true
 
@@ -400,7 +409,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         toggle()
     end
 end)
-
 
 
 
