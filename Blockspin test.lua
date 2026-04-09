@@ -1,56 +1,5 @@
 
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CurrentCamera = workspace.CurrentCamera
-local Debris = game:GetService("Debris")
-
-local Players, RunService, Camera, LocalPlayer, Mouse =
-    game:GetService("Players"),
-    game:GetService("RunService"),
-    workspace.CurrentCamera,
-    game.Players.LocalPlayer,
-    game.Players.LocalPlayer:GetMouse()
-
-local Net = require(ReplicatedStorage.Modules.Core.Net)
-local RagdollModule = require(ReplicatedStorage.Modules.Game.Ragdoll)
-local Vechine = require(ReplicatedStorage.Modules.Game.VehicleSystem.Vehicle)
-local CharModule = require(ReplicatedStorage.Modules.Core.Char)
-local SprintModule = require(ReplicatedStorage.Modules.Game.Sprint)
-local CrateController = require(ReplicatedStorage.Modules.Game.CrateSystem.Crate)
-
-local Settings = {}
-function c()
-    return Settings
-end
-
-local Client = Players.LocalPlayer
-local Character = Client.Character or Client.CharacterAdded:Wait()
-local UserId = Client.UserId
-local PlayerGui = Client.PlayerGui
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
-local Backpack = Client:WaitForChild("Backpack")
-
-Client.CharacterAdded:Connect(
-    function(newCharacter)
-        Character = newCharacter
-        Humanoid = Character:WaitForChild("Humanoid")
-        RootPart = Character:WaitForChild("HumanoidRootPart")
-        Backpack = Client:WaitForChild("Backpack")
-    end
-)
-
-local Sf = {}
-
-local Sprint = require(game:GetService("ReplicatedStorage").Modules.Game.Sprint)
-
-local consume_stamina = Sprint.consume_stamina
-local SprintBar = debug.getupvalue(consume_stamina, 2).sprint_bar
-
 
 
 local WindUI = loadstring(game:HttpGet(
@@ -1295,7 +1244,8 @@ UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.Z then
         SnapToggle:Set(not snapEnabled)
-
+        end
+    end)
 
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
