@@ -1168,6 +1168,99 @@ ChaterTab:Divider()
 
 ChaterTab:Section({Title = "Body"})
 
+local staminaConnection
+ChaterTab:Toggle({
+    Title = "infinity stamina",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not getgenv().Bypassed then
+                local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+                local func = debug.getupvalue(NetModule.get, 2)
+                debug.setconstant(func, 3, '__Bypass')
+                debug.setconstant(func, 4, '__Bypass')
+                getgenv().Bypassed = true
+            end
+
+            repeat task.wait() until getgenv().Bypassed
+
+            local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+            local SprintModule = require(ReplicatedStorage.Modules.Game.Sprint)
+
+            -- เธเธฑเธเธเนเธณ
+            if staminaConnection then staminaConnection:Disconnect() end
+
+            staminaConnection = RunService.Heartbeat:Connect(function()
+                NetModule.send("set_sprinting_1", true)
+            end)
+
+            local consume_stamina = SprintModule.consume_stamina
+            local SprintBar = debug.getupvalue(consume_stamina, 2).sprint_bar
+            local oldUpdate = SprintBar.update
+
+            SprintBar.update = function(...)
+                if getgenv().InfiniteStamina then
+                    return 1 -- เน€เธ•เนเธกเธ•เธฅเธญเธ”
+                end
+                return oldUpdate(...)
+            end
+
+            getgenv().InfiniteStamina = true
+        else
+            getgenv().InfiniteStamina = false
+            if staminaConnection then
+                staminaConnection:Disconnect()
+                staminaConnection = nil
+            end
+        end
+    end
+})
+
+
+ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(state)
+    jumpEnabled = state
+    if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
+    if state then
+        jumpConnection = UserInputService.JumpRequest:Connect(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, jumpPower, char.HumanoidRootPart.Velocity.Z)
+            end
+        end)
+    end
+end})
+ChaterTab:Slider({Title = "valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
+
+
+local DroppedFolder = workspace:FindFirstChild("DroppedItems")
+local NetModule = require(ReplicatedStorage.Modules.Core.Net)
+local pick
+ChaterTab:Toggle({
+    Title = "Auto Pickup item",
+    Default = false,
+    Callback = function(state)
+        if state then
+            pick = task.spawn(function()
+                while task.wait() do
+                    for _, v in pairs(DroppedFolder:GetChildren()) do
+                        if v:IsA("Model") and v:FindFirstChild("PickUpZone") then
+                            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if root and (v:GetPivot().Position - root.Position).Magnitude < 50 then
+                                NetModule.get("pickup_dropped_item", v)
+                            end
+                        end
+                    end
+                end
+            end)
+        else
+            if pick then
+                task.cancel(pick)
+                pick = nil
+            end
+        end
+    end
+})
 
 
 
