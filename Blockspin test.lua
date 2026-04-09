@@ -114,8 +114,6 @@ end)
 
 -- Silent aim
 
-
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -124,9 +122,9 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
-local SilentAimEnabled = true
-local TracerEnabled = true
-local ShowFOV = true
+local SilentAimEnabled = false
+local TracerEnabled = false 
+local ShowFOV = false 
 local FOV = 150
 local HitPart = "Head"
 local SavedFriends = {}
@@ -162,6 +160,7 @@ targetDot.Radius = 5
 targetDot.Filled = true
 targetDot.Visible = false
 
+-- 🔥 เอฟเฟคกระสุน
 local function createBulletTracer(fromPos, toPos)
     local line = Drawing.new("Line")
     line.Color = Color3.fromRGB(0, 0, 0)
@@ -235,6 +234,10 @@ end
 
 local send = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Send")
 
+-- ✅ กันเอฟเฟคสแปม
+local lastShot = 0
+local shotCooldown = 0.08
+
 local oldFire
 oldFire = hookfunction(send.FireServer, function(self, ...)
     local args = {...}
@@ -245,21 +248,29 @@ oldFire = hookfunction(send.FireServer, function(self, ...)
         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
         local originPart = getGunOrigin()
 
-        if part and hrp and originPart then
-            local predictedPos = part.Position + hrp.AssemblyLinearVelocity * getPrediction(hrp)
+        -- ✅ กรองว่าเป็น "ยิงจริง"
+        if typeof(args[4]) == "CFrame" and typeof(args[5]) == "table" then
+            if part and hrp and originPart then
+                local predictedPos = part.Position + hrp.AssemblyLinearVelocity * getPrediction(hrp)
 
-            createBulletTracer(originPart.Position, predictedPos)
+                -- 🔥 เอฟเฟคกระสุน (เฉพาะตอนยิง)
+                local now = tick()
+                if now - lastShot >= shotCooldown then
+                    lastShot = now
+                    createBulletTracer(originPart.Position, predictedPos)
+                end
 
-            args[4] = CFrame.new(originPart.Position, predictedPos)
+                args[4] = CFrame.new(originPart.Position, predictedPos)
 
-            args[5] = {
-                [1] = {
+                args[5] = {
                     [1] = {
-                        Instance = part,
-                        Position = predictedPos
+                        [1] = {
+                            Instance = part,
+                            Position = predictedPos
+                        }
                     }
                 }
-            }
+            end
         end
     end
 
@@ -296,6 +307,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
 
 
 
