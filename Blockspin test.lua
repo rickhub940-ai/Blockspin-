@@ -114,214 +114,216 @@ end)
 
 -- Silent aim
 
-
--- ========== SILENT AIM HYBRID (FOV Dipper + Ballistic PIG HUB + 3D Tracer สีดำ) ==========
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local Net = require(ReplicatedStorage.Modules.Core.Net)
 
-
-local SilentAimEnabled = true
-local ShowFOV = true
-local TracerEnabled = true
+-- ============ ตั้งค่า ============
+local SilentAimEnabled = false 
+local TracerEnabled = false 
+local ShowFOV = false 
 local FOV = 150
 local HitPart = "Head"
 local SavedFriends = {}
 
+local PRED_NORMAL = 0.12
+local VELOCITY_LIMIT = 250
+local LEAD_TIME = 0.15  -- เวลายิงดัก (วินาที)
 
-local fovCircle = Drawing.new("Circle")
-fovCircle.Color = Color3.new(1,1,1)
-fovCircle.Thickness = 2
-fovCircle.NumSides = 100
-fovCircle.Filled = false
-
-local tracerLine = Drawing.new("Line")
-tracerLine.Color = Color3.fromRGB(255, 50, 50)
-tracerLine.Thickness = 2
-tracerLine.Visible = false
-
-
-local function solveQuadratic(A, B, C)
-    local d = B^2 - 4*A*C
-    if d < 0 then return nil, nil end
-    local sqrtD = math.sqrt(d)
-    return (-B - sqrtD) / (2*A), (-B + sqrtD) / (2*A)
+-- 🔫 GUN
+local Guns = {
+"P226","MP5","M24","Draco","Glock","Sawnoff","Uzi","G3","C9",
+"Hunting Rifle","Anaconda","AK47","Remington","Double Barrel"
+}
+local GunTable = {}
+for _,v in ipairs(Guns) do
+    GunTable[v] = true
 end
 
-local function getFlightTime(dir, gravity, speed)
-    local r1, r2 = solveQuadratic(
-        gravity:Dot(gravity) / 3.8,
-        gravity:Dot(dir) - speed^2,
-        dir:Dot(dir)
-    )
-    if r1 and r2 then
-        if r1 > 0 and r1 < r2 then return math.sqrt(r1)
-        elseif r2 > 0 and r2 < r1 then return math.sqrt(r2) end
-    end
-    return 0
-end
+-- 🎯 FOV CIRCLE
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.new(1,1,1)
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Visible = ShowFOV
 
-local function bulletDrop(acc, t)
-    return 0.001 * acc * (t ^ 2)
-end
+-- 🔴 TRACER LINE
+local TracerLine = Drawing.new("Line")
+TracerLine.Color = Color3.new(1,1,1)
+TracerLine.Thickness = 2
+TracerLine.Visible = false
 
-local function predictPos(targetPos, vel, travelTime, gravity)
-    return targetPos + vel * travelTime + bulletDrop(gravity, travelTime)
-end
-local TargetHistory = {}
-local function updateHistory(target, pos)
-    TargetHistory[target] = TargetHistory[target] or {}
-    if #TargetHistory[target] >= 3 then table.remove(TargetHistory[target], 1) end
-    table.insert(TargetHistory[target], {pos = pos, time = tick()})
-end
+-- 🔴 TARGET DOT
+local TargetDot = Drawing.new("Circle")
+TargetDot.Color = Color3.new(1,1,1)
+TargetDot.Radius = 4
+TargetDot.Filled = true
+TargetDot.Visible = false
 
-local function getVelocity(target, currentPos)
-    local hist = TargetHistory[target]
-    if not hist or #hist == 0 then return Vector3.zero end
+-- ============ เก็บตำแหน่งสำหรับคำนวณความเร็จจริง ============
+local LastPositions = {}
+
+-- ============ ฟังก์ชันคำนวณความเร็จจริงจากตำแหน่ง ============
+local function getRealVelocity(hrp)
+    local plr = Players:GetPlayerFromCharacter(hrp.Parent)
+    if not plr then return nil end
+    
     local now = tick()
-    if #hist == 1 then
-        local dt = math.max(now - hist[1].time, 1e-6)
-        return (currentPos - hist[1].pos) / dt
-    elseif #hist == 2 then
-        local dt = math.max(hist[2].time - hist[1].time, 1e-6)
-        return (hist[2].pos - hist[1].pos) / dt
-    else
-        local p1, p2, p3 = hist[#hist-2], hist[#hist-1], hist[#hist]
-        local dt1 = math.max(p2.time - p1.time, 1e-6)
-        local dt2 = math.max(p3.time - p2.time, 1e-6)
-        local v1 = (p2.pos - p1.pos) / dt1
-        local v2 = (p3.pos - p2.pos) / dt2
-        local accel = (v2 - v1) / math.max(dt1 + dt2, 1e-6)
-        local weight = dt2 / (dt1 + dt2)
-        return v2 * weight + v1 * (1 - weight) + accel * dt2 * 0.5
-    end
-end
-
-local function getGunOrigin()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("HumanoidRootPart")
-end
-
-local function getTargetPart(char)
-    if HitPart == "Body" then
-        return char:FindFirstChild("HumanoidRootPart")
-    end
-    return char:FindFirstChild("Head")
-end
-
-local function getClosestTarget()
-    local closest, shortest = nil, math.huge
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local currentPos = hrp.Position
+    local data = LastPositions[plr]
     
-    for _, plr in pairs(Players:GetPlayers()) do
+    if not data then
+        LastPositions[plr] = { pos = currentPos, time = now }
+        return nil
+    end
+    
+    local dt = now - data.time
+    if dt < 0.033 then return nil end
+    
+    local realVel = (currentPos - data.pos) / dt
+    
+    LastPositions[plr] = { pos = currentPos, time = now }
+    
+    return realVel
+end
+
+-- ============ ฟังก์ชันทำนาย (ยิงดักทุกคน) ============
+local function getPredictedPosition(part, hrp)
+    local realVel = getRealVelocity(hrp)
+    
+    if realVel then
+        local speed = realVel.Magnitude
+        
+        if speed > VELOCITY_LIMIT then
+            return part.Position + realVel * 0.08
+        else
+            return part.Position + realVel * LEAD_TIME
+        end
+    end
+    
+    return part.Position
+end
+
+-- ============ ฟังก์ชันหลัก ============
+local function getPart(char)
+    return HitPart == "Body" and char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+end
+
+local function getClosest()
+    local best, dist = nil, math.huge
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and not SavedFriends[plr.Name] and plr.Character then
-            local part = getTargetPart(plr.Character)
+            local part = getPart(plr.Character)
             if part then
                 local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    local dist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if dist < FOV and dist < shortest then
-                        shortest = dist
-                        closest = plr
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < FOV and d < dist then
+                        dist = d
+                        best = plr
                     end
                 end
             end
         end
     end
-    return closest
+    return best
 end
-local function create3DTracer(from, to)
-    if not TracerEnabled then return end
-    local dist = (to - from).Magnitude
-    if dist < 0.1 then return end
+
+-- 🎯 ยิงเส้น (ดำ/ขาว)
+local ToggleShot = false
+local function drawShot(fromPos, toPos)
+    ToggleShot = not ToggleShot
     
-    local tracer = Instance.new("Part", Workspace)
-    tracer.Size = Vector3.new(0.15, 0.15, dist)
-    tracer.Color = Color3.fromRGB(0, 0, 0)
-    tracer.Material = Enum.Material.Neon
-    tracer.CFrame = CFrame.new(from, to) * CFrame.new(0, 0, -dist / 2)
-    tracer.CanCollide = false
-    tracer.Anchored = true
+    local p = Instance.new("Part")
+    p.Anchored = true
+    p.CanCollide = false
+    p.Material = Enum.Material.Neon
+    p.Color = ToggleShot and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
     
-    task.spawn(function()
-        for i = 1, 10 do
-            tracer.Transparency = i / 10
-            task.wait(0.03)
-        end
-        tracer:Destroy()
-    end)
-    Debris:AddItem(tracer, 0.5)
+    local dist = (toPos - fromPos).Magnitude
+    p.Size = Vector3.new(0.25, 0.25, dist)
+    p.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -dist/2)
+    
+    p.Parent = Workspace
+    Debris:AddItem(p, 1.5)
 end
-local oldFire
-oldFire = hookfunction(Net.send, function(self, ...)
+
+-- ============ HOOK ============
+local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Send")
+
+local old
+old = hookfunction(Remote.FireServer, function(self, ...)
     local args = {...}
-    if args[1] == "shoot_gun" and SilentAimEnabled then
-        local target = getClosestTarget()
+    
+    if SilentAimEnabled then
+        local target = getClosest()
+        
         if target and target.Character then
-            local part = getTargetPart(target.Character)
+            local part = getPart(target.Character)
             local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-            local originPart = getGunOrigin()
-            local rootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if part and hrp and originPart and rootPart then
-                local clientPos = rootPart.Position
-                local targetPos = part.Position
-                local gravity = Vector3.new(0, -Workspace.Gravity, 0)
-                local bulletSpeed = 1000
-                updateHistory(target, targetPos)
-                local velocity = getVelocity(target, targetPos)
-                local direction = targetPos - clientPos
-                local travelTime = getFlightTime(direction, gravity, bulletSpeed)
-                local predictedPos = targetPos
-                if travelTime > 0 then
-                    predictedPos = predictPos(targetPos, velocity, travelTime, gravity)
-                end
-                create3DTracer(originPart.Position, predictedPos)
+            local myHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+            
+            if part and hrp and myHead then
+                local predPos = getPredictedPosition(part, hrp)
                 
-                args[3] = CFrame.new(clientPos, predictedPos)
-                if args[4] then
-                    for _, v in pairs(args[4]) do
-                        for _, x in pairs(v) do
-                            x.Normal = Vector3.new(0, 1, 0)
-                            x.Position = predictedPos
-                            x.Instance = part
-                        end
-                    end
-                end
+                drawShot(myHead.Position, predPos)
+                
+                args[4] = CFrame.new(myHead.Position, predPos)
+                args[5] = {
+                    [1] = {
+                        [1] = {
+                            Instance = part,
+                            Position = predPos
+                        }
+                    }
+                }
             end
         end
     end
     
-    return oldFire(self, unpack(args))
+    return old(self, unpack(args))
 end)
 
+-- ============ RENDER ============
 RunService.RenderStepped:Connect(function()
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    fovCircle.Visible = ShowFOV and SilentAimEnabled
-    fovCircle.Position = center
-    fovCircle.Radius = FOV
-    tracerLine.Visible = false
-    if TracerEnabled and SilentAimEnabled then
-        local target = getClosestTarget()
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    FOVCircle.Visible = ShowFOV and SilentAimEnabled
+    FOVCircle.Position = center
+    FOVCircle.Radius = FOV
+    
+    TracerLine.Visible = false
+    TargetDot.Visible = false
+    
+    if TracerEnabled then
+        local target = getClosest()
         if target and target.Character then
-            local part = getTargetPart(target.Character)
+            local part = getPart(target.Character)
             if part then
                 local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    tracerLine.From = center
-                    tracerLine.To = Vector2.new(pos.X, pos.Y)
-                    tracerLine.Visible = true
+                    local screenPos = Vector2.new(pos.X, pos.Y)
+                    
+                    TracerLine.From = center
+                    TracerLine.To = screenPos
+                    TracerLine.Visible = true
+                    
+                    TargetDot.Position = screenPos
+                    TargetDot.Visible = true
                 end
             end
         end
     end
 end)
+
 
 
 
@@ -1033,6 +1035,7 @@ end
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
+
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = SilentAimEnabled,
@@ -1083,7 +1086,6 @@ CombatTab:Dropdown({
         end
     end
 })
-
 
 
 
