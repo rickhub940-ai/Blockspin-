@@ -1021,6 +1021,36 @@ local function startAutoFarm()
     isRunning = false
 end
 
+-- มุดดิน
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+local snapEnabled = false
+local snapHeight = 10
+
+local function snapUnderMap()
+    if not HumanoidRootPart then return end
+    local pos = HumanoidRootPart.Position
+    HumanoidRootPart.CFrame = CFrame.new(pos.X, pos.Y - snapHeight, pos.Z)
+end
+
+local connection
+local function startLock()
+    if connection then connection:Disconnect() end
+    connection = RunService.Heartbeat:Connect(function()
+        if snapEnabled and HumanoidRootPart then
+            local pos = HumanoidRootPart.Position
+            HumanoidRootPart.CFrame = CFrame.new(pos.X, pos.Y - snapHeight, pos.Z)
+        end
+    end)
+end
 
 
 
@@ -1217,6 +1247,7 @@ ChaterTab:Toggle({
 })
 
 
+
 ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(state)
     jumpEnabled = state
     if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
@@ -1231,6 +1262,39 @@ ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(sta
     end
 end})
 ChaterTab:Slider({Title = "valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
+
+
+ChaterTab:Divider()
+
+ChaterTab:Section({Title = "Mod"})
+
+local SnapToggle = ChaterTab:Toggle({
+    Title = "Snap Under Map",
+    Default = false,
+    Callback = function(state)
+        snapEnabled = state
+        if state then 
+            snapUnderMap()
+            startLock()
+        elseif connection then
+            connection:Disconnect()
+        end
+    end
+})
+
+local SnapSlider = ChaterTab:Slider({
+    Title = "Snap Height",
+    Step = 1,
+    Value = { Min = 1, Max = 50, Default = 10 },
+    Callback = function(value)
+        snapHeight = value
+    end
+})
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.Z then
+        SnapToggle:Set(not snapEnabled)
 
 
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
