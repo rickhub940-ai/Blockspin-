@@ -124,28 +124,29 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ============ ตั้งค่า ============
-local SilentAimEnabled = false 
-local TracerEnabled = false 
-local ShowFOV = false 
+local SilentAimEnabled = true
+local TracerEnabled = true
+local ShowFOV = false
 local FOV = 150
 local HitPart = "Head"
 local SavedFriends = {}
 
 local PRED_NORMAL = 0.12
 local VELOCITY_LIMIT = 250
-local LEAD_TIME = 0.15  -- เวลายิงดัก (วินาที)
+local LEAD_TIME = 0.12  -- เวลายิงดัก
 
--- 🔫 GUN
+-- ============ อาวุธที่รองรับ ============
 local Guns = {
-"P226","MP5","M24","Draco","Glock","Sawnoff","Uzi","G3","C9",
-"Hunting Rifle","Anaconda","AK47","Remington","Double Barrel"
+    "P226","MP5","M24","Draco","Glock","Sawnoff","Uzi","G3","C9",
+    "Hunting Rifle","Anaconda","AK47","Remington","Double Barrel"
 }
+
 local GunTable = {}
 for _,v in ipairs(Guns) do
     GunTable[v] = true
 end
 
--- 🎯 FOV CIRCLE
+-- ============ Drawing ============
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Color = Color3.new(1,1,1)
 FOVCircle.Thickness = 2
@@ -153,15 +154,14 @@ FOVCircle.NumSides = 100
 FOVCircle.Filled = false
 FOVCircle.Visible = ShowFOV
 
--- 🔴 TRACER LINE
+-- เส้นชี้เป้า 2D (แสดงแค่ตอนยิง)
 local TracerLine = Drawing.new("Line")
-TracerLine.Color = Color3.new(1,1,1)
+TracerLine.Color = Color3.new(1,0,0)
 TracerLine.Thickness = 2
 TracerLine.Visible = false
 
--- 🔴 TARGET DOT
 local TargetDot = Drawing.new("Circle")
-TargetDot.Color = Color3.new(1,1,1)
+TargetDot.Color = Color3.new(1,0,0)
 TargetDot.Radius = 4
 TargetDot.Filled = true
 TargetDot.Visible = false
@@ -201,18 +201,77 @@ local function getPredictedPosition(part, hrp)
         local speed = realVel.Magnitude
         
         if speed > VELOCITY_LIMIT then
-            return part.Position + realVel * 0.08
+            return part.Position + realVel * 0.08  -- คนโกง ดักน้อย
         else
-            return part.Position + realVel * LEAD_TIME
+            return part.Position + realVel * LEAD_TIME  -- คนปกติ ดัก 0.12
         end
     end
     
     return part.Position
 end
 
+-- ============ ฟังก์ชันโชว์เส้นชี้เป้า (แสดงแค่ตอนยิง) ============
+local function showTracer(targetScreenPos)
+    if not TracerEnabled then return end
+    
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    TracerLine.From = center
+    TracerLine.To = targetScreenPos
+    TracerLine.Visible = true
+    
+    TargetDot.Position = targetScreenPos
+    TargetDot.Visible = true
+    
+    task.delay(0.15, function()
+        TracerLine.Visible = false
+        TargetDot.Visible = false
+    end)
+end
+
+-- ============ เส้นกระสุน 3D ============
+local ToggleShot = false
+local function drawShot(fromPos, toPos)
+    ToggleShot = not ToggleShot
+    
+    local p = Instance.new("Part")
+    p.Anchored = true
+    p.CanCollide = false
+    p.Material = Enum.Material.Neon
+    p.Color = ToggleShot and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
+    
+    local dist = (toPos - fromPos).Magnitude
+    p.Size = Vector3.new(0.25, 0.25, dist)
+    p.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -dist/2)
+    
+    p.Parent = Workspace
+    Debris:AddItem(p, 1.5)
+end
+
 -- ============ ฟังก์ชันหลัก ============
+local function holdingGun(args)
+    local ok, tool = pcall(function() return args[3] end)
+    if ok and typeof(tool) == "Instance" and GunTable[tool.Name] then
+        return true
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    for _, v in ipairs(char:GetChildren()) do
+        if (v:IsA("Tool") or v:IsA("Model")) and GunTable[v.Name] then
+            return true
+        end
+    end
+    
+    return false
+end
+
 local function getPart(char)
-    return HitPart == "Body" and char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Head")
+    if HitPart == "Body" then
+        return char:FindFirstChild("HumanoidRootPart")
+    end
+    return char:FindFirstChild("Head")
 end
 
 local function getClosest()
@@ -234,26 +293,17 @@ local function getClosest()
             end
         end
     end
+    
     return best
 end
 
--- 🎯 ยิงเส้น (ดำ/ขาว)
-local ToggleShot = false
-local function drawShot(fromPos, toPos)
-    ToggleShot = not ToggleShot
+local function wallCheck(fromPos, toPos, char)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+    params.FilterDescendantsInstances = {LocalPlayer.Character, char}
+    params.IgnoreWater = true
     
-    local p = Instance.new("Part")
-    p.Anchored = true
-    p.CanCollide = false
-    p.Material = Enum.Material.Neon
-    p.Color = ToggleShot and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
-    
-    local dist = (toPos - fromPos).Magnitude
-    p.Size = Vector3.new(0.25, 0.25, dist)
-    p.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -dist/2)
-    
-    p.Parent = Workspace
-    Debris:AddItem(p, 1.5)
+    return Workspace:Raycast(fromPos, toPos - fromPos, params) ~= nil
 end
 
 -- ============ HOOK ============
@@ -263,7 +313,7 @@ local old
 old = hookfunction(Remote.FireServer, function(self, ...)
     local args = {...}
     
-    if SilentAimEnabled then
+    if SilentAimEnabled and holdingGun(args) then
         local target = getClosest()
         
         if target and target.Character then
@@ -276,7 +326,19 @@ old = hookfunction(Remote.FireServer, function(self, ...)
                 
                 drawShot(myHead.Position, predPos)
                 
-                args[4] = CFrame.new(myHead.Position, predPos)
+                if TracerEnabled then
+                    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        showTracer(Vector2.new(pos.X, pos.Y))
+                    end
+                end
+                
+                if wallCheck(myHead.Position, predPos, target.Character) then
+                    args[4] = CFrame.new(math.huge, math.huge, math.huge)
+                else
+                    args[4] = CFrame.new(myHead.Position, predPos)
+                end
+                
                 args[5] = {
                     [1] = {
                         [1] = {
@@ -292,38 +354,13 @@ old = hookfunction(Remote.FireServer, function(self, ...)
     return old(self, unpack(args))
 end)
 
--- ============ RENDER ============
 RunService.RenderStepped:Connect(function()
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     
     FOVCircle.Visible = ShowFOV and SilentAimEnabled
     FOVCircle.Position = center
     FOVCircle.Radius = FOV
-    
-    TracerLine.Visible = false
-    TargetDot.Visible = false
-    
-    if TracerEnabled then
-        local target = getClosest()
-        if target and target.Character then
-            local part = getPart(target.Character)
-            if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local screenPos = Vector2.new(pos.X, pos.Y)
-                    
-                    TracerLine.From = center
-                    TracerLine.To = screenPos
-                    TracerLine.Visible = true
-                    
-                    TargetDot.Position = screenPos
-                    TargetDot.Visible = true
-                end
-            end
-        end
-    end
 end)
-
 
 
 
@@ -1034,8 +1071,6 @@ end
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
-
-
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = SilentAimEnabled,
@@ -1086,6 +1121,7 @@ CombatTab:Dropdown({
         end
     end
 })
+
 
 
 
