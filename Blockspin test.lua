@@ -514,7 +514,10 @@ end
 
 local esp = ESP.new()
 
-RunService.RenderStepped:Connect(function()
+local function updateESP()
+    if not ESPSettings.Box and not ESPSettings.Name and not ESPSettings.Distance and not ESPSettings.Health then
+        return
+    end
     for _,plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer then
             local char = plr.Character
@@ -526,7 +529,8 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
+end
+espConnection = RunService.RenderStepped:Connect(updateESP)
 
 Players.PlayerRemoving:Connect(function(plr)
     esp:remove(plr)
@@ -1171,26 +1175,26 @@ local ItemsESPToggle = EspTab:Toggle({
                     createBillboardForPlayer(p)
                 end
             end
-            ESPConnection = RunService.Heartbeat:Connect(function()
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and p.Character then
-                        createBillboardForPlayer(p)
-                    end
-                end
-            end)
+            if not espCharConnection then
+                espCharConnection = Players.PlayerAdded:Connect(function(p)
+                    p.CharacterAdded:Connect(function()
+                        task.wait(0.5)
+                        if ESPEnabled then createBillboardForPlayer(p) end
+                    end)
+                end)
+            end
         else
-            if ESPConnection then
-                ESPConnection:Disconnect()
-                ESPConnection = nil
+            if espCharConnection then
+                espCharConnection:Disconnect()
+                espCharConnection = nil
             end
             for _, billboard in pairs(BillboardCache) do
-                billboard:Destroy()
+                pcall(function() billboard:Destroy() end)
             end
             BillboardCache = {}
         end
     end
 })
-
 
 
 
