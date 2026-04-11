@@ -1,0 +1,1336 @@
+-- ============================================
+-- Dipper HUB | Premium [BLOCK SPIN]
+-- Optimized & Organized Version
+-- ============================================
+
+-- ============================================
+-- SERVICES
+-- ============================================
+local Services = {
+    Players = game:GetService("Players"),
+    RunService = game:GetService("RunService"),
+    ReplicatedStorage = game:GetService("ReplicatedStorage"),
+    UserInputService = game:GetService("UserInputService"),
+    CoreGui = game:GetService("CoreGui"),
+    Debris = game:GetService("Debris"),
+    Lighting = game:GetService("Lighting"),
+    TeleportService = game:GetService("TeleportService"),
+    HttpService = game:GetService("HttpService")
+}
+
+local Plr = Services.Players
+local RS = Services.RunService
+local Rep = Services.ReplicatedStorage
+local UIS = Services.UserInputService
+local CG = Services.CoreGui
+local Deb = Services.Debris
+local Lighting = Services.Lighting
+local TP = Services.TeleportService
+local Http = Services.HttpService
+
+-- ============================================
+-- LOCAL REFERENCES
+-- ============================================
+local player = Plr.LocalPlayer
+local Camera = workspace.CurrentCamera
+local ReplicatedStorage = Rep
+
+-- ============================================
+-- WINDUI SETUP
+-- ============================================
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=" .. player.UserId .. "&size=420x420&format=Png"
+
+local Window = WindUI:CreateWindow({
+    Title = "Dipper HUB | Premium [BLOCK SPIN]",
+    Icon = "rbxassetid://124339558110081",
+    Author = "D!PPER-TEAM",
+    Folder = "N HUB",
+    Size = UDim2.fromOffset(700, 540),
+    Theme = "Light",
+    Transparent = true,
+    Resizable = true,
+    User = { Enabled = false, Custom = { Name = "Anonymous", Bio = "RickHUB USER", Image = avatar } }
+})
+
+Window:Tag({ Title = "v0.0.1", Icon = "github", Color = Color3.fromHex("#00bfff"), Radius = 5 })
+Window:EditOpenButton({ Enabled = false })
+
+-- ============================================
+-- TOGGLE BUTTON (Drag & Drop)
+-- ============================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WindUI_Toggle"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = CG
+
+local ToggleBtn = Instance.new("ImageButton")
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -25)
+ToggleBtn.BackgroundTransparency = 1
+ToggleBtn.Image = "rbxassetid://124339558110081"
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+ToggleBtn.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = ToggleBtn
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(255, 255, 255)
+UIStroke.Parent = ToggleBtn
+
+local opened = true
+local function toggle()
+    opened = not opened
+    if Window.UI then Window.UI.Enabled = opened else Window:Toggle() end
+end
+
+ToggleBtn.MouseButton1Click:Connect(function()
+    ToggleBtn:TweenSize(UDim2.new(0, 56, 0, 56), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.12, true, function()
+        ToggleBtn:TweenSize(UDim2.new(0, 50, 0, 50), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.12, true)
+    end)
+    toggle()
+end)
+
+UIS.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.T then toggle() end
+end)
+
+-- ============================================
+-- TABS
+-- ============================================
+local Tabs = {
+    Main = Window:Tab({ Title = "Main", Icon = "list" }),
+    Combat = Window:Tab({ Title = "Combat", Icon = "swords" }),
+    GunMods = Window:Tab({ Title = "Gun mods", Icon = "airplay" }),
+    Visual = Window:Tab({ Title = "Visual", Icon = "eye" }),
+    Car = Window:Tab({ Title = "Car", Icon = "car" }),
+    Misc = Window:Tab({ Title = "Misc", Icon = "layers" }),
+    Server = Window:Tab({ Title = "Server", Icon = "server" })
+}
+
+local MainTab = Tabs.Main
+local CombatTab = Tabs.Combat
+local ModTab = Tabs.GunMods
+local VisualTab = Tabs.Visual
+local CarTab = Tabs.Car
+local MiscTab = Tabs.Misc
+local ServerTab = Tabs.Server
+
+-- ============================================
+-- MAIN TAB - PLAYER MODIFIERS
+-- ============================================
+MainTab:Section({ Title = "Player Modifier:" })
+
+-- Variables
+local defaultJumpPower = 20
+local maxJumpPower = 100
+local highJumpPower = 60
+local walkSpeedMultiplier = 1
+local highJumpActive = false
+local speedActive = false
+local speedConnection = nil
+
+-- Functions
+local function setJumpPower(power)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.UseJumpPower = true
+        hum.JumpPower = math.clamp(power, 0, maxJumpPower)
+    end
+end
+
+local function setupCharacter(char)
+    local hum = char:WaitForChild("Humanoid")
+    hum.AutoJumpEnabled = false
+    hum.JumpPower = highJumpActive and highJumpPower or defaultJumpPower
+    if highJumpActive then hum.UseJumpPower = true end
+end
+
+local function updateSpeed()
+    if speedConnection then speedConnection:Disconnect() end
+    if not speedActive then return end
+    speedConnection = RS.RenderStepped:Connect(function()
+        local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then hum.WalkSpeed = 16 * walkSpeedMultiplier end
+    end)
+end
+
+-- Connections
+player.CharacterAdded:Connect(setupCharacter)
+if player.Character then setupCharacter(player.Character) end
+
+-- UI Elements
+MainTab:Toggle({ Title = "High jump (กระโดดสูง)", Default = false, Callback = function(state)
+    highJumpActive = state
+    setJumpPower(state and highJumpPower or defaultJumpPower)
+end })
+
+MainTab:Slider({ Title = "High Jump Power (ปรับความสูง)", Value = { Min = 20, Max = maxJumpPower, Default = highJumpPower }, Step = 1, Callback = function(v)
+    highJumpPower = tonumber(v)
+    if highJumpActive then setJumpPower(highJumpPower) end
+end })
+
+MainTab:Toggle({ Title = "Walk Speed (วิ่งไว)", Default = false, Callback = function(state)
+    speedActive = state
+    updateSpeed()
+end })
+
+MainTab:Slider({ Title = "Speed Multiplier (ปรับความเร็ว)", Value = { Min = 1, Max = 5, Default = 1 }, Step = 1, Callback = function(v)
+    walkSpeedMultiplier = tonumber(v)
+end })
+
+-- ============================================
+-- MAIN TAB - ANTI AIM & ANTI KILL
+-- ============================================
+local character, humanoid, rootPart
+local originalPos = nil
+local isEvading = false
+local noclipActive = false
+local AntiAimConnection = nil
+local antiAimCooldown = false
+
+local Char = require(Rep.Modules.Core.Char)
+
+local function setNoclip(state)
+    if noclipActive == state or not character then return end
+    noclipActive = state
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then part.CanCollide = not state end
+    end
+end
+
+local function startAntiAim()
+    if AntiAimConnection then return end
+    AntiAimConnection = RS.Heartbeat:Connect(function()
+        if not getgenv().AntiAimAssiant or antiAimCooldown then return end
+        local hum = Char.get_hum()
+        if hum and not hum:GetAttribute("HasBeenDowned") then
+            local root = Char.get_hrp()
+            if root then
+                antiAimCooldown = true
+                local A, B, C = root.Velocity, root.AssemblyLinearVelocity, root.AssemblyAngularVelocity
+                root.Velocity = Vector3.new(math.random(-5000, 5000), math.random(-5000, 5000), math.random(-5000, 5000))
+                root.AssemblyLinearVelocity = Vector3.new(math.random(-5000, 5000), math.random(-5000, 5000), math.random(-5000, 5000))
+                root.AssemblyAngularVelocity = Vector3.new(math.random(-5000, 5000), math.random(-5000, 5000), math.random(-5000, 5000))
+                RS.RenderStepped:Wait()
+                root.Velocity, root.AssemblyLinearVelocity, root.AssemblyAngularVelocity = A, B, C
+                task.wait(0.05)
+                antiAimCooldown = false
+            end
+        end
+    end)
+end
+
+local function stopAntiAim()
+    if AntiAimConnection then AntiAimConnection:Disconnect(); AntiAimConnection = nil end
+end
+
+local function setupChar(char)
+    character = char
+    humanoid = char:WaitForChild("Humanoid")
+    rootPart = char:WaitForChild("HumanoidRootPart")
+    isEvading = false
+    originalPos = nil
+end
+
+if player.Character then setupChar(player.Character) end
+player.CharacterAdded:Connect(setupChar)
+
+-- Anti Kill Loop
+RS.Heartbeat:Connect(function()
+    if not getgenv().AutoAntiKill or not humanoid or not rootPart then return end
+    
+    if humanoid.Health > 0 and humanoid.Health < 17 and not isEvading then
+        isEvading = true
+        originalPos = rootPart.CFrame
+        stopAntiAim()
+        setNoclip(true)
+        task.spawn(function()
+            local startTime = tick()
+            while isEvading and humanoid and humanoid.Health > 0 and tick() - startTime < 3 do
+                rootPart.CFrame = rootPart.CFrame * CFrame.new(Vector3.new(math.random(-300, 300), math.random(-100, 300), math.random(-300, 300)))
+                task.wait(0.05)
+            end
+            if isEvading then
+                isEvading = false
+                setNoclip(false)
+                if originalPos and rootPart then rootPart.CFrame = originalPos end
+                if getgenv().AntiAimAssiant then startAntiAim() end
+            end
+        end)
+    elseif humanoid.Health >= 30 and isEvading then
+        isEvading = false
+        setNoclip(false)
+        if originalPos and rootPart then rootPart.CFrame = originalPos end
+        if getgenv().AntiAimAssiant then startAntiAim() end
+    end
+end)
+
+MainTab:Toggle({ Title = "Anti Aim (กันล็อค)", Flag = "antiaim", Value = false, Callback = function(v)
+    getgenv().AntiAimAssiant = v
+    if v then startAntiAim() else stopAntiAim() end
+end })
+
+MainTab:Toggle({ Title = "Anti Kill (กันตาย)", Flag = "autoantikill", Value = false, Callback = function(v)
+    getgenv().AutoAntiKill = v
+end })
+
+-- ============================================
+-- MAIN TAB - ANTI RAGDOLL
+-- ============================================
+local antiRagdollConnection = nil
+MainTab:Toggle({ Title = "Anti Ragdoll (กันล้ม)", Flag = "AntiRagdoll", Value = false, Callback = function(v)
+    _G.AntiRagdoll = v
+    if v and not antiRagdollConnection then
+        antiRagdollConnection = RS.Stepped:Connect(function()
+            if not _G.AntiRagdoll then return end
+            pcall(function()
+                local RagdollModule = require(Rep.Modules.Game.Ragdoll)
+                if RagdollModule.is_ragdolling and RagdollModule.is_ragdolling.get() then
+                    RagdollModule.is_ragdolling.set(false)
+                    pcall(function() Net.send("end_ragdoll_early") end)
+                    pcall(function() Net.send("clear_ragdoll") end)
+                end
+            end)
+        end)
+    elseif not v and antiRagdollConnection then
+        antiRagdollConnection:Disconnect()
+        antiRagdollConnection = nil
+    end
+end })
+
+-- ============================================
+-- MAIN TAB - PICKUP ITEM
+-- ============================================
+local DroppedItems = workspace:WaitForChild("DroppedItems")
+local PICKUP_DISTANCE = 350
+local pickupEnabled = false
+local pickupConnection = nil
+
+local function firetouch(partA, partB)
+    if not firetouchinterest or not partA or not partB then return end
+    for i = 1, 25 do
+        firetouchinterest(partA, partB, 0)
+        firetouchinterest(partA, partB, 1)
+    end
+end
+
+MainTab:Toggle({ Title = "Pickup Item (ดูดของ)", Default = false, Callback = function(state)
+    pickupEnabled = state
+    if state and not pickupConnection then
+        pickupConnection = RS.RenderStepped:Connect(function()
+            if not pickupEnabled or not rootPart or not rootPart.Parent then return end
+            for _, item in ipairs(DroppedItems:GetChildren()) do
+                local zone = item:FindFirstChild("PickUpZone")
+                if zone and zone:IsA("BasePart") and (rootPart.Position - zone.Position).Magnitude <= PICKUP_DISTANCE then
+                    firetouch(zone, rootPart)
+                    break
+                end
+            end
+        end)
+    elseif not state and pickupConnection then
+        pickupConnection:Disconnect()
+        pickupConnection = nil
+    end
+end })
+
+-- ============================================
+-- MAIN TAB - INFINITY STAMINA
+-- ============================================
+local staminaConnection = nil
+MainTab:Toggle({ Title = "Infinity stamina (วิ่งไม่จำกัด)", Default = false, Callback = function(state)
+    if state then
+        if not getgenv().Bypassed then
+            local NetModule = require(Rep.Modules.Core.Net)
+            local func = debug.getupvalue(NetModule.get, 2)
+            debug.setconstant(func, 3, '__Bypass')
+            debug.setconstant(func, 4, '__Bypass')
+            getgenv().Bypassed = true
+        end
+        repeat task.wait() until getgenv().Bypassed
+        
+        local NetModule = require(Rep.Modules.Core.Net)
+        local SprintModule = require(Rep.Modules.Game.Sprint)
+        
+        if staminaConnection then staminaConnection:Disconnect() end
+        staminaConnection = RS.Heartbeat:Connect(function()
+            NetModule.send("set_sprinting_1", true)
+        end)
+        
+        local consume_stamina = SprintModule.consume_stamina
+        local SprintBar = debug.getupvalue(consume_stamina, 2).sprint_bar
+        local oldUpdate = SprintBar.update
+        SprintBar.update = function(...)
+            return getgenv().InfiniteStamina and 1 or oldUpdate(...)
+        end
+        getgenv().InfiniteStamina = true
+    else
+        getgenv().InfiniteStamina = false
+        if staminaConnection then staminaConnection:Disconnect(); staminaConnection = nil end
+    end
+end })
+
+-- ============================================
+-- MAIN TAB - SNAP (UNDERGROUND)
+-- ============================================
+MainTab:Section({ Title = "Snap:" })
+
+local EnabledSnapRunning = false
+local YoffsetValue = 70
+local SnapThread = nil
+
+local function SetSnapState(value)
+    if EnabledSnapRunning == value then return end
+    EnabledSnapRunning = value
+    if value then
+        if SnapThread then return end
+        SnapThread = task.spawn(function()
+            while EnabledSnapRunning and rootPart do
+                local targetY = rootPart.Position.Y - YoffsetValue
+                rootPart.CFrame = rootPart.CFrame + Vector3.new(0, targetY - rootPart.Position.Y, 0)
+                task.wait()
+            end
+            SnapThread = nil
+        end)
+    else
+        SnapThread = nil
+    end
+    if MainTab:Get("UndergroundToggle") then
+        MainTab:Get("UndergroundToggle"):SetValue(value)
+    end
+end
+
+MainTab:Toggle({ Title = "Snap (มุดดิน)", Value = false, Flag = "UndergroundToggle", Callback = SetSnapState })
+MainTab:Keybind({ Title = "Snap Keybind (ปุ่มลัด)", Flag = "snap_keybind", Value = "G", Callback = function()
+    SetSnapState(not EnabledSnapRunning)
+end })
+MainTab:Slider({ Title = "Snap High (ความลึก)", Flag = "snap_height", Step = 1, Value = { Min = 1, Max = 70, Default = YoffsetValue }, Callback = function(v)
+    YoffsetValue = v
+end })
+
+-- ============================================
+-- COMBAT TAB - SILENT AIM
+-- ============================================
+local Network = require(Rep.Modules.Core.Net)
+local FOV = 200
+local TargetPartName = "Head"
+local SilentAimEnabled = false
+local DebugEnabled = false
+local TargetHistory = {}
+local HIGH_VEL_THRESHOLD = 250
+
+-- Drawing objects
+local fovCircle = Drawing.new("Circle")
+fovCircle.Radius = FOV
+fovCircle.Thickness = 1
+fovCircle.Filled = false
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Visible = false
+
+local tracer = Drawing.new("Line")
+tracer.Thickness = 2
+tracer.Color = Color3.fromRGB(255, 0, 0)
+tracer.Visible = false
+
+-- Helper functions
+local function GetPlayerNames()
+    local t = {}
+    for _, v in ipairs(Plr:GetPlayers()) do
+        if v ~= player then table.insert(t, v.Name) end
+    end
+    return t
+end
+
+local function WorldToViewPoint(pos)
+    return Camera:WorldToViewportPoint(pos)
+end
+
+local function IsAlive(model)
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+    return hum and root and hum.Health > 0
+end
+
+local function GetVelocity(target, pos)
+    local t = tick()
+    TargetHistory[target] = TargetHistory[target] or {}
+    local hist = TargetHistory[target]
+    if #hist >= 3 then table.remove(hist, 1) end
+    table.insert(hist, { pos = pos, time = t })
+    if #hist < 2 then return Vector3.zero end
+    local p1, p2 = hist[#hist - 1], hist[#hist]
+    local dt = math.max(p2.time - p1.time, 1e-6)
+    return (p2.pos - p1.pos) / dt
+end
+
+local function GetClosestTarget()
+    local closest, closestDist = nil, math.huge
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, v in ipairs(Plr:GetPlayers()) do
+        if v ~= player and not v:GetAttribute("SilentAimIgnore") then
+            local char = v.Character
+            if char and IsAlive(char) then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local pos, onScreen = WorldToViewPoint(root.Position)
+                    if onScreen then
+                        local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if d < FOV and d < closestDist then
+                            closest, closestDist = char, d
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function DebugGun(fromPos, toPos)
+    local distance = (toPos - fromPos).Magnitude
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(0.6, 0.6, distance)
+    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = Color3.fromRGB(255, 255, 255)
+    part.Parent = workspace
+    Deb:AddItem(part, 1)
+end
+
+-- UI Elements
+CombatTab:Toggle({ Title = "Silent Aim (ล็อคเป้า)", Default = false, Callback = function(v) SilentAimEnabled = v end })
+CombatTab:Toggle({ Title = "Debug Gun", Default = false, Callback = function(v) DebugEnabled = v end })
+CombatTab:Slider({ Title = "FOV Size (ปรับขนาดวง)", Step = 1, Value = { Min = 50, Max = 800, Default = FOV }, Callback = function(v)
+    FOV = v
+    fovCircle.Radius = v
+end })
+CombatTab:Dropdown({ Title = "Target Part (ปรับยิงหัว/ตัว)", Values = { "Head", "HumanoidRootPart" }, Multi = false, Default = "Head", Callback = function(v)
+    TargetPartName = v
+end })
+CombatTab:Dropdown({ Title = "Save Friend (ไม่ยิงเพื่อน)", Values = GetPlayerNames(), Multi = true, Default = {}, Callback = function(selected)
+    for _, plr in ipairs(Plr:GetPlayers()) do plr:SetAttribute("SilentAimIgnore", false) end
+    for _, name in ipairs(selected) do
+        local plr = Plr:FindFirstChild(name)
+        if plr then plr:SetAttribute("SilentAimIgnore", true) end
+    end
+end })
+
+-- Render FOV and Tracer
+RS.RenderStepped:Connect(function()
+    if not SilentAimEnabled then
+        fovCircle.Visible = false
+        tracer.Visible = false
+        return
+    end
+    fovCircle.Visible = true
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    local target = GetClosestTarget()
+    if target and target:FindFirstChild(TargetPartName) then
+        local pos, onScreen = WorldToViewPoint(target[TargetPartName].Position)
+        if onScreen then
+            tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+            tracer.To = Vector2.new(pos.X, pos.Y)
+            tracer.Visible = true
+        else
+            tracer.Visible = false
+        end
+    else
+        tracer.Visible = false
+    end
+end)
+
+-- Hook shoot_gun
+local OldSend = hookfunction(Network.send, function(...)
+    local args = { ... }
+    if args[1] == "shoot_gun" and SilentAimEnabled then
+        local target = GetClosestTarget()
+        if target then
+            local plr = Plr:GetPlayerFromCharacter(target)
+            if plr and plr:GetAttribute("SilentAimIgnore") then
+                return OldSend(...)
+            end
+            local part = target:FindFirstChild(TargetPartName)
+            if part then
+                local char = player.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local myPos, targetPos = root.Position, part.Position
+                    local vel = GetVelocity(target, targetPos)
+                    local predictedPos = vel.Magnitude >= HIGH_VEL_THRESHOLD and targetPos or targetPos
+                    args[3] = CFrame.new(myPos, predictedPos)
+                    if DebugEnabled then DebugGun(myPos, predictedPos) end
+                    for _, v in pairs(args[4] or {}) do
+                        for _, x in pairs(v) do
+                            x.Position = predictedPos
+                            x.Instance = part
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return OldSend(table.unpack(args))
+end)
+
+-- ============================================
+-- VISUAL TAB - ESP SYSTEM (Combined)
+-- ============================================
+local ESPEnabled = false
+local NameESPEnabled = false
+local HealthESPEnabled = false
+local DistanceESPEnabled = false
+local TracerEnabled = false
+local HighlightESPEnabled = false
+
+local ESP_COLOR = Color3.fromRGB(0, 170, 255)
+local ESPObjects = { Names = {}, Boxes = {}, HealthBars = {}, Distances = {}, Tracers = {}, Highlights = {} }
+
+local function CreateESPObjects(p)
+    if p == player then return end
+    
+    ESPObjects.Names[p] = Drawing.new("Text")
+    ESPObjects.Names[p].Visible = false
+    ESPObjects.Names[p].Color = Color3.fromRGB(255, 255, 255)
+    ESPObjects.Names[p].Size = 12
+    ESPObjects.Names[p].Center = true
+    ESPObjects.Names[p].Outline = true
+    ESPObjects.Names[p].Font = 2
+    
+    ESPObjects.Boxes[p] = Drawing.new("Square")
+    ESPObjects.Boxes[p].Visible = false
+    ESPObjects.Boxes[p].Color = ESP_COLOR
+    ESPObjects.Boxes[p].Thickness = 0.7
+    ESPObjects.Boxes[p].Filled = false
+    
+    ESPObjects.HealthBars[p] = Drawing.new("Line")
+    ESPObjects.HealthBars[p].Visible = false
+    ESPObjects.HealthBars[p].Thickness = 1
+    
+    ESPObjects.Distances[p] = Drawing.new("Text")
+    ESPObjects.Distances[p].Visible = false
+    ESPObjects.Distances[p].Color = Color3.fromRGB(255, 255, 255)
+    ESPObjects.Distances[p].Size = 12
+    ESPObjects.Distances[p].Center = true
+    ESPObjects.Distances[p].Outline = true
+    ESPObjects.Distances[p].Font = 2
+    
+    ESPObjects.Tracers[p] = Drawing.new("Line")
+    ESPObjects.Tracers[p].Visible = false
+    ESPObjects.Tracers[p].Color = ESP_COLOR
+    ESPObjects.Tracers[p].Thickness = 1
+end
+
+local function RemoveESPObjects(p)
+    for _, obj in pairs(ESPObjects) do
+        if obj[p] then obj[p]:Remove(); obj[p] = nil end
+    end
+end
+
+for _, p in ipairs(Plr:GetPlayers()) do CreateESPObjects(p) end
+Plr.PlayerAdded:Connect(CreateESPObjects)
+Plr.PlayerRemoving:Connect(RemoveESPObjects)
+
+local function UpdateHighlight(p, enabled)
+    if enabled then
+        if not ESPObjects.Highlights[p] and p.Character then
+            local hl = Instance.new("Highlight")
+            hl.Name = "ESPHighlight"
+            hl.FillColor = ESP_COLOR
+            hl.OutlineColor = ESP_COLOR
+            hl.FillTransparency = 0.5
+            hl.OutlineTransparency = 0
+            hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            hl.Parent = p.Character
+            ESPObjects.Highlights[p] = hl
+        end
+    elseif ESPObjects.Highlights[p] then
+        ESPObjects.Highlights[p]:Destroy()
+        ESPObjects.Highlights[p] = nil
+    end
+end
+
+-- Combined ESP Render Loop
+local lastESPUpdate = 0
+local espUpdateInterval = 1/30
+
+RS.RenderStepped:Connect(function()
+    local now = tick()
+    if now - lastESPUpdate < espUpdateInterval then return end
+    lastESPUpdate = now
+    
+    local anyESP = ESPEnabled or NameESPEnabled or HealthESPEnabled or DistanceESPEnabled or TracerEnabled
+    
+    if not anyESP and not HighlightESPEnabled then
+        for _, p in pairs(Plr:GetPlayers()) do
+            if p ~= player then
+                if ESPObjects.Names[p] then ESPObjects.Names[p].Visible = false end
+                if ESPObjects.Boxes[p] then ESPObjects.Boxes[p].Visible = false end
+                if ESPObjects.HealthBars[p] then ESPObjects.HealthBars[p].Visible = false end
+                if ESPObjects.Distances[p] then ESPObjects.Distances[p].Visible = false end
+                if ESPObjects.Tracers[p] then ESPObjects.Tracers[p].Visible = false end
+            end
+        end
+        return
+    end
+    
+    local myPos = player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character.HumanoidRootPart.Position
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, p in ipairs(Plr:GetPlayers()) do
+        if p ~= player then
+            local char = p.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            
+            if hrp and hum and hum.Health > 0 then
+                local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+                local headPos = char:FindFirstChild("Head") and Camera:WorldToViewportPoint(char.Head.Position)
+                
+                -- ESP Box
+                if ESPEnabled and ESPObjects.Boxes[p] and visible then
+                    local scale = (Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0)).Y - Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0)).Y)
+                    local width, height = math.abs(scale) * 0.6, math.abs(scale)
+                    ESPObjects.Boxes[p].Size = Vector2.new(width, height)
+                    ESPObjects.Boxes[p].Position = Vector2.new(pos.X - width / 2, pos.Y - height / 2)
+                    ESPObjects.Boxes[p].Visible = true
+                elseif ESPObjects.Boxes[p] then
+                    ESPObjects.Boxes[p].Visible = false
+                end
+                
+                -- ESP Name
+                if NameESPEnabled and ESPObjects.Names[p] and headPos and headPos.Z > 0 then
+                    ESPObjects.Names[p].Text = p.Name
+                    ESPObjects.Names[p].Position = Vector2.new(headPos.X, headPos.Y - 20)
+                    ESPObjects.Names[p].Visible = true
+                elseif ESPObjects.Names[p] then
+                    ESPObjects.Names[p].Visible = false
+                end
+                
+                -- ESP Health
+                if HealthESPEnabled and ESPObjects.HealthBars[p] and visible then
+                    local top = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 3, 0))
+                    local bottom = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                    local height = math.abs(top.Y - bottom.Y)
+                    local healthPercent = hum.Health / hum.MaxHealth
+                    local barHeight = height * healthPercent
+                    local x = pos.X - (height * 0.35)
+                    ESPObjects.HealthBars[p].From = Vector2.new(x, bottom.Y)
+                    ESPObjects.HealthBars[p].To = Vector2.new(x, bottom.Y - barHeight)
+                    ESPObjects.HealthBars[p].Color = Color3.fromRGB(255 - (255 * healthPercent), 255 * healthPercent, 0)
+                    ESPObjects.HealthBars[p].Visible = true
+                elseif ESPObjects.HealthBars[p] then
+                    ESPObjects.HealthBars[p].Visible = false
+                end
+                
+                -- ESP Distance
+                if DistanceESPEnabled and ESPObjects.Distances[p] and myPos and visible then
+                    local distance = math.floor((myPos - hrp.Position).Magnitude)
+                    ESPObjects.Distances[p].Text = distance .. "m"
+                    ESPObjects.Distances[p].Position = Vector2.new(pos.X, pos.Y + 30)
+                    ESPObjects.Distances[p].Visible = true
+                elseif ESPObjects.Distances[p] then
+                    ESPObjects.Distances[p].Visible = false
+                end
+                
+                -- ESP Tracer
+                if TracerEnabled and ESPObjects.Tracers[p] and visible then
+                    ESPObjects.Tracers[p].From = Vector2.new(center.X, 0)
+                    ESPObjects.Tracers[p].To = Vector2.new(pos.X, pos.Y)
+                    ESPObjects.Tracers[p].Visible = true
+                elseif ESPObjects.Tracers[p] then
+                    ESPObjects.Tracers[p].Visible = false
+                end
+            else
+                if ESPObjects.Boxes[p] then ESPObjects.Boxes[p].Visible = false end
+                if ESPObjects.Names[p] then ESPObjects.Names[p].Visible = false end
+                if ESPObjects.HealthBars[p] then ESPObjects.HealthBars[p].Visible = false end
+                if ESPObjects.Distances[p] then ESPObjects.Distances[p].Visible = false end
+                if ESPObjects.Tracers[p] then ESPObjects.Tracers[p].Visible = false end
+            end
+            
+            UpdateHighlight(p, HighlightESPEnabled)
+        end
+    end
+end)
+
+-- ESP Toggles
+VisualTab:Toggle({ Title = "ESP Name (มองชื่อ)", Default = false, Callback = function(v) NameESPEnabled = v end })
+VisualTab:Toggle({ Title = "ESP Box (กล่อง)", Default = false, Callback = function(v) ESPEnabled = v end })
+VisualTab:Toggle({ Title = "ESP Health (มองเลือด)", Default = false, Callback = function(v) HealthESPEnabled = v end })
+VisualTab:Toggle({ Title = "ESP Highlight (มองทะลุ)", Default = false, Callback = function(v) HighlightESPEnabled = v end })
+VisualTab:Toggle({ Title = "ESP Distance (มองระยะ)", Default = false, Callback = function(v) DistanceESPEnabled = v end })
+VisualTab:Toggle({ Title = "ESP Tracer (มองเส้น)", Default = false, Callback = function(v) TracerEnabled = v end })
+
+-- ============================================
+-- VISUAL TAB - INVENTORY VIEWER
+-- ============================================
+local InventoryViewerEnabled = false
+local inventoryViewerConnection = nil
+
+local function GetColorFromRarity(rarityName)
+    local colors = {
+        Common = Color3.fromRGB(255, 255, 255),
+        UnCommon = Color3.fromRGB(99, 255, 52),
+        Rare = Color3.fromRGB(51, 170, 255),
+        Legendary = Color3.fromRGB(255, 150, 0),
+        Epic = Color3.fromRGB(237, 44, 255),
+        Omega = Color3.fromRGB(255, 20, 51),
+    }
+    return colors[rarityName] or Color3.fromRGB(255, 255, 255)
+end
+
+VisualTab:Toggle({ Title = "Inventory Viewer (มองของ)", Default = false, Callback = function(Value)
+    InventoryViewerEnabled = Value
+    if Value and not inventoryViewerConnection then
+        inventoryViewerConnection = RS.Stepped:Connect(function()
+            if not InventoryViewerEnabled then return end
+            pcall(function()
+                for _, v in ipairs(Plr:GetPlayers()) do
+                    if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                        local root = v.Character.HumanoidRootPart
+                        local gui = root:FindFirstChild("ItemBillboard")
+                        if not gui then
+                            gui = Instance.new("BillboardGui")
+                            gui.Name = "ItemBillboard"
+                            gui.AlwaysOnTop = true
+                            gui.Size = UDim2.new(0, 200, 0, 50)
+                            gui.StudsOffset = Vector3.new(0, -5, 0)
+                            gui.Parent = root
+                            local bg = Instance.new("Frame")
+                            bg.Name = "BG"
+                            bg.BackgroundTransparency = 1
+                            bg.Size = UDim2.new(1, 0, 1, 0)
+                            bg.AnchorPoint = Vector2.new(0.5, 0.5)
+                            bg.Position = UDim2.new(0.5, 0, 0.5, 0)
+                            bg.Parent = gui
+                            local layout = Instance.new("UIListLayout")
+                            layout.FillDirection = Enum.FillDirection.Horizontal
+                            layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                            layout.VerticalAlignment = Enum.VerticalAlignment.Center
+                            layout.Padding = UDim.new(0, 5)
+                            layout.Parent = bg
+                        end
+                        local bg = gui:FindFirstChild("BG")
+                        if not bg then continue end
+                        
+                        for _, child in pairs(bg:GetChildren()) do
+                            if child:IsA("Frame") then child:Destroy() end
+                        end
+                        
+                        local Items = {}
+                        for _, container in pairs({ v:FindFirstChild("Backpack"), v.Character }) do
+                            if container then
+                                for _, tool in pairs(container:GetChildren()) do
+                                    if tool:IsA("Tool") and not tool:GetAttribute("JobTool") and not tool:GetAttribute("Locked") then
+                                        local rarity = tool:GetAttribute("RarityName")
+                                        if rarity and not Items[rarity] then
+                                            Items[rarity] = true
+                                            if not bg:FindFirstChild(rarity .. "_bg") then
+                                                local iconBg = Instance.new("Frame")
+                                                iconBg.Name = rarity .. "_bg"
+                                                iconBg.Size = UDim2.new(0, 34, 0, 34)
+                                                iconBg.BackgroundTransparency = 1
+                                                iconBg.Parent = bg
+                                                local bgImage = Instance.new("ImageLabel")
+                                                bgImage.Name = "Background"
+                                                bgImage.Size = UDim2.new(1, 0, 1, 0)
+                                                bgImage.BackgroundTransparency = 1
+                                                bgImage.Image = "rbxassetid://137066731814190"
+                                                bgImage.ImageColor3 = GetColorFromRarity(rarity)
+                                                bgImage.Parent = iconBg
+                                                Instance.new("UICorner", iconBg).CornerRadius = UDim.new(0.15, 0)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        gui.Enabled = true
+                    end
+                end
+            end)
+        end)
+    elseif not Value and inventoryViewerConnection then
+        inventoryViewerConnection:Disconnect()
+        inventoryViewerConnection = nil
+        for _, v in ipairs(Plr:GetPlayers()) do
+            if v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+                local gui = v.Character.HumanoidRootPart:FindFirstChild("ItemBillboard")
+                if gui then gui:Destroy() end
+            end
+        end
+    end
+end })
+
+-- ============================================
+-- VISUAL TAB - ITEM ESP (Dropped Items)
+-- ============================================
+local DroppedFolder = workspace:WaitForChild("DroppedItems")
+local ItemESPs = {}
+local ShowItemESP = true
+
+local BlueColor = Color3.fromRGB(0, 150, 255)
+local GreenColor = Color3.fromRGB(0, 255, 0)
+
+local function getItemColor(item)
+    return item.Name:lower():find("money") and GreenColor or BlueColor
+end
+
+local function createItemESP(item)
+    if ItemESPs[item] then return end
+    local color = getItemColor(item)
+    local highlights = {}
+    
+    local function addHighlight(part)
+        local hl = Instance.new("Highlight")
+        hl.Adornee = part
+        hl.FillColor = color
+        hl.OutlineColor = color
+        hl.FillTransparency = 0.8
+        hl.OutlineTransparency = 0
+        hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Enabled = true
+        hl.Parent = part
+        table.insert(highlights, hl)
+    end
+    
+    if item:IsA("BasePart") then
+        addHighlight(item)
+    elseif item:IsA("Model") then
+        for _, v in ipairs(item:GetDescendants()) do
+            if v:IsA("BasePart") then addHighlight(v) end
+        end
+    end
+    
+    local basePart = item:IsA("BasePart") and item or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+    local label = nil
+    
+    if basePart then
+        local bb = Instance.new("BillboardGui")
+        bb.Adornee = basePart
+        bb.Size = UDim2.new(0, 55, 0, 9)
+        bb.StudsOffset = Vector3.new(0, basePart.Size.Y / 2 + 0.6, 0)
+        bb.AlwaysOnTop = true
+        bb.Parent = basePart
+        label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Text = "[" .. item.Name .. "]"
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 8
+        label.TextColor3 = color
+        label.TextStrokeTransparency = 0.5
+        label.Visible = true
+        label.Parent = bb
+    end
+    
+    ItemESPs[item] = { highlights = highlights, label = label }
+end
+
+local function removeItemESP(item)
+    local data = ItemESPs[item]
+    if not data then return end
+    for _, hl in ipairs(data.highlights) do if hl then hl:Destroy() end end
+    if data.label and data.label.Parent then data.label.Parent:Destroy() end
+    ItemESPs[item] = nil
+end
+
+for _, item in ipairs(DroppedFolder:GetChildren()) do createItemESP(item) end
+DroppedFolder.ChildAdded:Connect(createItemESP)
+DroppedFolder.ChildRemoved:Connect(removeItemESP)
+
+-- ============================================
+-- CAR TAB - BUMP AURA
+-- ============================================
+local function BumpAuraLoop()
+    while _G.BumpAura do
+        task.wait(0.15)
+        local car = Vechine.get_car_player_is_in()
+        if car and car:FindFirstChild("DriverSeat") then
+            for _, target in pairs(CharModule.get_all()) do
+                if target ~= character and target then
+                    local hrp = target:FindFirstChild("HumanoidRootPart")
+                    if hrp and rootPart and (rootPart.Position - hrp.Position).Magnitude < 100 then
+                        local Assembly = car.DriverSeat.AssemblyLinearVelocity + Vector3.new(65, 65, 65)
+                        Net.send("run_over", car, target, Assembly)
+                    end
+                end
+            end
+        end
+    end
+end
+
+CarTab:Toggle({ Title = "Bump Aura", Flag = "BumpAura", Value = false, Callback = function(v)
+    _G.BumpAura = v
+    if v then task.spawn(BumpAuraLoop) end
+end })
+
+-- ============================================
+-- MISC TAB - SKIP ANIMATION
+-- ============================================
+local EnabledSkip = false
+MiscTab:Toggle({ Title = "Skip Animation", Flag = "skip_anim", Value = false, Callback = function(v)
+    EnabledSkip = v
+    if v then
+        task.spawn(function()
+            while EnabledSkip do
+                pcall(function()
+                    if CrateController and CrateController.class and CrateController.class.objects then
+                        for _, crate in pairs(CrateController.class.objects) do
+                            if crate and crate.states and crate.states.open then
+                                crate.states.open.set(true)
+                            end
+                        end
+                        if CrateController.skipping then CrateController.skipping.set(true) end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+    end
+end })
+
+-- ============================================
+-- MISC TAB - FREE CAMERA
+-- ============================================
+local freecam = false
+local dummy = nil
+local savedValues = {}
+local yaw, pitch = 0, 0
+local SPEED = 260
+local ROT_SENS = 0.0025
+
+local function startSpectator()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not hrp then return end
+    
+    dummy = Instance.new("Part")
+    dummy.Name = "SpecDummy_" .. player.UserId
+    dummy.Size = Vector3.new(1, 1, 1)
+    dummy.Anchored = true
+    dummy.CanCollide = false
+    dummy.Transparency = 1
+    dummy.Parent = workspace
+    dummy.CFrame = Camera.CFrame
+    
+    savedValues = {
+        WalkSpeed = hum.WalkSpeed,
+        JumpPower = hum.JumpPower,
+        AutoRotate = hum.AutoRotate,
+        PlatformStand = hum.PlatformStand,
+        FOV = Camera.FieldOfView
+    }
+    
+    hum.WalkSpeed = 0
+    hum.JumpPower = 0
+    hum.AutoRotate = false
+    hum.PlatformStand = true
+    Camera.CameraType = Enum.CameraType.Scriptable
+    
+    local look = (Camera.CFrame.Position - dummy.Position).Unit
+    yaw = math.atan2(look.X, look.Z)
+    pitch = math.asin(math.clamp(look.Y, -1, 1))
+    freecam = true
+end
+
+local function stopSpectator()
+    freecam = false
+    if dummy then dummy:Destroy() end
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.WalkSpeed = savedValues.WalkSpeed or 16
+            hum.JumpPower = savedValues.JumpPower or 50
+            hum.AutoRotate = savedValues.AutoRotate or true
+            hum.PlatformStand = savedValues.PlatformStand or false
+        end
+        Camera.CameraType = Enum.CameraType.Custom
+        Camera.CameraSubject = hum
+    end
+    if savedValues.FOV then Camera.FieldOfView = savedValues.FOV end
+end
+
+-- Freecam GUI
+local spectatorFrame = Instance.new("Frame", player:WaitForChild("PlayerGui"))
+spectatorFrame.Size = UDim2.new(0, 100, 0, 30)
+spectatorFrame.Position = UDim2.new(0, 10, 0, 10)
+spectatorFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+spectatorFrame.BackgroundTransparency = 0.3
+local spectatorToggle = Instance.new("TextButton", spectatorFrame)
+spectatorToggle.Size = UDim2.new(1, 0, 1, 0)
+spectatorToggle.Text = "Freecam OFF"
+spectatorToggle.BackgroundTransparency = 1
+spectatorToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+spectatorToggle.MouseButton1Click:Connect(function()
+    if freecam then stopSpectator() else startSpectator() end
+    spectatorToggle.Text = freecam and "Freecam ON" or "Freecam OFF"
+end)
+
+RS.RenderStepped:Connect(function(dt)
+    if not freecam or not dummy then return end
+    local moveVec = Vector3.zero
+    if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec = moveVec + Camera.CFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec = moveVec - Camera.CFrame.LookVector end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec = moveVec - Camera.CFrame.RightVector end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec = moveVec + Camera.CFrame.RightVector end
+    if moveVec.Magnitude > 0 then
+        dummy.CFrame = dummy.CFrame + moveVec.Unit * SPEED * dt
+    end
+    Camera.CFrame = CFrame.new(dummy.Position, dummy.Position + CFrame.Angles(pitch, yaw, 0).LookVector)
+end)
+
+-- ============================================
+-- MISC TAB - GRAPHICS
+-- ============================================
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
+
+local function Bootsfps()
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("Sky") or v:IsA("Atmosphere") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect") then
+            v:Destroy()
+        end
+    end
+    Lighting.GlobalShadows = false
+    Lighting.Brightness = 0
+    Lighting.FogEnd = 9e9
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
+    if Terrain then
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterReflectance = 0
+        Terrain.WaterTransparency = 1
+    end
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
+            v.CastShadow = false
+        elseif v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
+            v.Enabled = false
+        end
+    end
+end
+
+local function RTX_ON()
+    for _, v in ipairs(Lighting:GetChildren()) do
+        if v:IsA("Atmosphere") or v:IsA("BloomEffect") or v:IsA("SunRaysEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("DepthOfFieldEffect") or v:IsA("Sky") then
+            v:Destroy()
+        end
+    end
+    
+    local Sky = Instance.new("Sky")
+    Sky.SkyboxBk = "rbxassetid://159454299"
+    Sky.SkyboxDn = "rbxassetid://159454296"
+    Sky.SkyboxFt = "rbxassetid://159454293"
+    Sky.SkyboxLf = "rbxassetid://159454286"
+    Sky.SkyboxRt = "rbxassetid://159454300"
+    Sky.SkyboxUp = "rbxassetid://159454288"
+    Sky.SunAngularSize = 21
+    Sky.Parent = Lighting
+    
+    Lighting.Technology = Enum.Technology.Future
+    Lighting.GlobalShadows = true
+    Lighting.ShadowSoftness = 1
+    Lighting.Brightness = 3
+    Lighting.ExposureCompensation = 0.25
+    Lighting.EnvironmentDiffuseScale = 1
+    Lighting.EnvironmentSpecularScale = 1
+    Lighting.ClockTime = 14
+    
+    local Atmosphere = Instance.new("Atmosphere")
+    Atmosphere.Density = 0.35
+    Atmosphere.Offset = 0.25
+    Atmosphere.Color = Color3.fromRGB(190, 210, 255)
+    Atmosphere.Decay = Color3.fromRGB(120, 150, 200)
+    Atmosphere.Glare = 0.35
+    Atmosphere.Haze = 1.2
+    Atmosphere.Parent = Lighting
+    
+    local Bloom = Instance.new("BloomEffect")
+    Bloom.Intensity = 1.2
+    Bloom.Size = 56
+    Bloom.Threshold = 0.85
+    Bloom.Parent = Lighting
+    
+    local SunRays = Instance.new("SunRaysEffect")
+    SunRays.Intensity = 0.25
+    SunRays.Spread = 0.85
+    SunRays.Parent = Lighting
+    
+    local CC = Instance.new("ColorCorrectionEffect")
+    CC.Brightness = 0.05
+    CC.Contrast = 0.25
+    CC.Saturation = 0.35
+    CC.TintColor = Color3.fromRGB(255, 245, 235)
+    CC.Parent = Lighting
+    
+    local DOF = Instance.new("DepthOfFieldEffect")
+    DOF.FarIntensity = 0.25
+    DOF.NearIntensity = 0.05
+    DOF.FocusDistance = 60
+    DOF.InFocusRadius = 40
+    DOF.Parent = Lighting
+    
+    if Terrain then
+        Terrain.WaterWaveSize = 1
+        Terrain.WaterWaveSpeed = 15
+        Terrain.WaterReflectance = 1
+        Terrain.WaterTransparency = 0.05
+    end
+    
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.CastShadow = true
+            if v.Material == Enum.Material.Plastic then
+                v.Material = Enum.Material.SmoothPlastic
+            end
+        end
+    end
+end
+
+MiscTab:Button({ Title = "Bootsfps", Icon = "zap", Callback = Bootsfps })
+MiscTab:Button({ Title = "RTX ON", Icon = "sparkles", Callback = RTX_ON })
+
+-- ============================================
+-- SERVER TAB
+-- ============================================
+ServerTab:Code({ Title = "Current Server", Code = " " .. (game.JobId or "Unknown") })
+ServerTab:Divider()
+ServerTab:Section({ Title = "Server Utilities:" })
+
+local ServerCode = ""
+ServerTab:Input({ Title = "Enter Server Code", Placeholder = "Paste server JobId here...", Callback = function(v) ServerCode = v or "" end })
+ServerTab:Button({ Title = "Join Code", Icon = "log-in", Callback = function()
+    if ServerCode ~= "" then TP:TeleportToPlaceInstance(game.PlaceId, ServerCode, player) end
+end })
+ServerTab:Button({ Title = "Rejoin", Icon = "refresh-ccw", Callback = function()
+    TP:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+end })
+ServerTab:Button({ Title = "Hop Server (Low Player)", Icon = "shuffle", Callback = function()
+    local success, req = pcall(function()
+        return game:HttpGet(string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", game.PlaceId))
+    end)
+    if success then
+        local data = Http:JSONDecode(req)
+        local servers = {}
+        if data and data.data then
+            for _, v in pairs(data.data) do
+                if v.playing < v.maxPlayers then table.insert(servers, v.id) end
+            end
+        end
+        if #servers > 0 then
+            TP:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
+        end
+    end
+end })
+
+-- ============================================
+-- MISC TAB - CONFIG SYSTEM
+-- ============================================
+local ConfigFile = "my_script_config.json"
+local Config = {}
+
+local function LoadConfig()
+    if isfile and isfile(ConfigFile) then
+        Config = Http:JSONDecode(readfile(ConfigFile))
+    end
+end
+
+local function SaveConfig()
+    if writefile then
+        writefile(ConfigFile, Http:JSONEncode(Config))
+    end
+end
+
+LoadConfig()
+
+MiscTab:Section({ Title = "Config" })
+MiscTab:Button({ Title = "Save Settings", Icon = "save", Callback = function()
+    Config.ESPEnabled = ESPEnabled
+    Config.NameESPEnabled = NameESPEnabled
+    Config.HealthESPEnabled = HealthESPEnabled
+    Config.DistanceESPEnabled = DistanceESPEnabled
+    Config.TracerEnabled = TracerEnabled
+    Config.HighlightESPEnabled = HighlightESPEnabled
+    Config.BumpAura = _G.BumpAura
+    Config.SkipAnim = EnabledSkip
+    Config.FreecamSpeed = SPEED
+    SaveConfig()
+end })
+MiscTab:Button({ Title = "Load Settings", Icon = "folder", Callback = function()
+    LoadConfig()
+    ESPEnabled = Config.ESPEnabled or false
+    NameESPEnabled = Config.NameESPEnabled or false
+    HealthESPEnabled = Config.HealthESPEnabled or false
+    DistanceESPEnabled = Config.DistanceESPEnabled or false
+    TracerEnabled = Config.TracerEnabled or false
+    HighlightESPEnabled = Config.HighlightESPEnabled or false
+    _G.BumpAura = Config.BumpAura or false
+    EnabledSkip = Config.SkipAnim or false
+    SPEED = Config.FreecamSpeed or 260
+end })
+
+-- ============================================
+-- COMBAT TAB - MULTI SHOOT
+-- ============================================
+getgenv().MultiShootAmount = 1
+CombatTab:Slider({ Title = "Multi Shoot Amount", Step = 1, Value = { Min = 1, Max = 7, Default = 1 }, Callback = function(v)
+    getgenv().MultiShootAmount = v
+end })
+
+OldSend = hookfunction(Network.send, function(...)
+    local args = { ... }
+    if args[1] == "shoot_gun" then
+        for _ = 1, (getgenv().MultiShootAmount or 1) do
+            OldSend(table.unpack(args))
+        end
+        return
+    end
+    return OldSend(...)
+end)
+
+-- ============================================
+-- GUN MODS TAB
+-- ============================================
+local gunModConnection = nil
+
+ModTab:Toggle({ Title = "Gun Mods (ปรับแต่งปืน)", Flag = "gun_mods", Value = false, Callback = function(v)
+    if v and not gunModConnection then
+        gunModConnection = RS.RenderStepped:Connect(function()
+            local tool = character and character:FindFirstChildWhichIsA("Tool")
+            if tool then
+                pcall(function()
+                    tool:SetAttribute("fire_rate", _G.FireRateGun or 1000)
+                    tool:SetAttribute("accuracy", _G.AccuracyGun or 1)
+                    tool:SetAttribute("Recoil", _G.RecoilGun or 0)
+                    tool:SetAttribute("Durability", _G.DurabilityGun or 1000)
+                end)
+            end
+        end)
+    elseif not v and gunModConnection then
+        gunModConnection:Disconnect()
+        gunModConnection = nil
+    end
+end })
+
+ModTab:Slider({ Title = "Fire Rate", Step = 1, Value = { Min = 100, Max = 5000, Default = 1000 }, Callback = function(v) _G.FireRateGun = v end })
+ModTab:Slider({ Title = "Recoil", Step = 0.1, Value = { Min = 0, Max = 10, Default = 0 }, Callback = function(v) _G.RecoilGun = v end })
+ModTab:Slider({ Title = "Accuracy", Step = 0.01, Value = { Min = 0, Max = 1, Default = 1 }, Callback = function(v) _G.AccuracyGun = v end })
+ModTab:Slider({ Title = "Durability", Step = 1, Value = { Min = 100, Max = 5000, Default = 1000 }, Callback = function(v) _G.DurabilityGun = v end })
+
+print("Dipper HUB - Loaded successfully!")
