@@ -1097,6 +1097,258 @@ end
 
 
 
+
+-- farm 7-11
+
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VIM = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local Client = Players.LocalPlayer
+local Character = Client.Character or Client.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
+local Backpack = Client:WaitForChild("Backpack")
+
+local fireproximityprompt = fireproximityprompt or getfenv().fireproximityprompt
+
+-- ========== ตัวแปร ==========
+local StopWalking = false
+local isRunning = false
+local currentTargetPosition = nil
+local checkDistanceTask = nil
+
+-- ค่าเริ่มต้น: ปิด
+_G.AutoSevenEleven = false
+
+-- ========== ฟังก์ชันระยะทาง ==========
+local function dist(pos)
+    return (pos - RootPart.Position).Magnitude
+end
+
+-- ========== ลบ DoorSystem และ VehicleBlockers ==========
+local function removeBlockers()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "DoorSystem" then 
+            v:Destroy()
+        end
+        if v.Name == "VehicleBlockers" then 
+            v:Destroy()
+        end
+    end
+end
+
+removeBlockers()
+workspace.DescendantAdded:Connect(function(descendant)
+    task.wait(0.5)
+    if descendant.Name == "DoorSystem" or descendant.Name == "VehicleBlockers" then
+        removeBlockers()
+    end
+end)
+
+-- ========== ฟังก์ชันกดรับงานผ่าน UI ==========
+local function autoApplyJob()
+    if Client:GetAttribute("Job") == "shelf_stocker" then 
+        return true 
+    end
+    
+    local jobGui = Client.PlayerGui:FindFirstChild("JobApplication")
+    if jobGui and jobGui.Enabled then
+        local frame = jobGui:FindFirstChild("JobApplicationFrame") or jobGui:FindFirstChild("Frame")
+        local btn = frame and (frame:FindFirstChild("ApplyJob") or frame:FindFirstChild("Apply"))
+        
+        if frame and frame.Visible and btn and btn.Visible then
+            pcall(function()
+                btn.Selectable = true
+                GuiService.SelectedObject = btn
+                task.wait(0.1)
+                VIM:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+                task.wait(0.05)
+                VIM:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+            end)
+            task.wait(1.5)
+            return Client:GetAttribute("Job") == "shelf_stocker"
+        end
+    end
+    return false
+end
+
+-- ========== ฟังก์ชันเดิน ==========
+local function walkTo(destination, value)
+    if not value then return end
+    if not destination then return end
+    
+    currentTargetPosition = destination
+    
+    local path = PathfindingService:CreatePath({
+        AgentCanJump = true,
+        AgentJumpHeight = 2,
+        AgentHeight = 5.5,
+        AgentRadius = 2.5,
+    })
+    
+    local success = pcall(function()
+        path:ComputeAsync(RootPart.Position, destination)
+    end)
+    
+    if success and path.Status == Enum.PathStatus.Success then
+        for _, wp in ipairs(path:GetWaypoints()) do
+            if StopWalking or not _G.AutoSevenEleven then return end
+            if Humanoid.Health <= 0 then break end
+            
+            local finished = false
+            local conn
+            conn = Humanoid.MoveToFinished:Connect(function()
+                finished = true
+                if conn then conn:Disconnect() end
+            end)
+            
+            Humanoid:MoveTo(wp.Position)
+            
+            if wp.Action == Enum.PathWaypointAction.Jump then
+                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+            
+            repeat task.wait() until finished or StopWalking or not _G.AutoSevenEleven
+            if StopWalking or not _G.AutoSevenEleven then return end
+        end
+    end
+end
+
+-- ========== ตรวจสอบและเดินกลับเมื่อกระเด็น ==========
+local function startPositionCheck(targetPos)
+    if checkDistanceTask then
+        task.cancel(checkDistanceTask)
+    end
+    
+    checkDistanceTask = task.spawn(function()
+        while _G.AutoSevenEleven and targetPos do
+            task.wait(0.5)
+            if targetPos and dist(targetPos) > 4 and not StopWalking then
+                print("⚠️ กระเด็นออกจากตำแหน่ง กำลังเดินกลับ...")
+                walkTo(targetPos, true)
+            end
+        end
+    end)
+end
+
+local function stopPositionCheck()
+    if checkDistanceTask then
+        task.cancel(checkDistanceTask)
+        checkDistanceTask = nil
+    end
+end
+
+-- ========== ฟังก์ชันหยุดเดิน ==========
+local function StopWalkingFunc()
+    StopWalking = true
+    Humanoid:MoveTo(RootPart.Position)
+    task.wait(0.1)
+    StopWalking = false
+end
+
+-- ========== ระบบ Auto Seven Eleven Quest ==========
+local function AutoSevenElevenQuest(Value)
+    if not Value then 
+        StopWalkingFunc()
+        stopPositionCheck()
+        return 
+    end
+    
+    if Client:GetAttribute("Job") == "shelf_stocker" then
+        if not Backpack:FindFirstChild("BoxTool") and not Character:FindFirstChild("BoxTool") then
+            -- ไปรับ BoxTool
+            local boxPos = Vector3.new(143, 255, 207)
+            currentTargetPosition = boxPos
+            startPositionCheck(boxPos)
+            
+            if dist(boxPos) < 5 then
+                local boxPrompt = workspace:FindFirstChild("Map")
+                    and workspace.Map:FindFirstChild("Tiles")
+                    and workspace.Map.Tiles:FindFirstChild("GasStationTile")
+                    and workspace.Map.Tiles.GasStationTile:FindFirstChild("Quick11")
+                    and workspace.Map.Tiles.GasStationTile.Quick11:FindFirstChild("Interior")
+                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("ShelfStockingJob")
+                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob:FindFirstChild("NormalBox")
+                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob.NormalBox:FindFirstChild("ProximityPrompt")
+                
+                if boxPrompt then
+                    fireproximityprompt(boxPrompt, 3)
+                end
+            end
+            walkTo(boxPos, Value)
+        else
+            if Character:FindFirstChild("BoxTool") then
+                -- มี BoxTool แล้ว ไปจัดชั้นวาง
+                local shelves = workspace:FindFirstChild("Map")
+                    and workspace.Map:FindFirstChild("Tiles")
+                    and workspace.Map.Tiles:FindFirstChild("GasStationTile")
+                    and workspace.Map.Tiles.GasStationTile:FindFirstChild("Quick11")
+                    and workspace.Map.Tiles.GasStationTile.Quick11:FindFirstChild("Interior")
+                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("ShelfStockingJob")
+                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob:FindFirstChild("Shelves")
+                
+                if shelves then
+                    for _, shelf in ipairs(shelves:GetChildren()) do
+                        if not _G.AutoSevenEleven then break end
+                        if shelf:FindFirstChild("Attachment") then
+                            currentTargetPosition = shelf.Position
+                            startPositionCheck(shelf.Position)
+                            walkTo(shelf.Position, Value)
+                            task.wait(1)
+                        end
+                    end
+                end
+            else
+                local tool = Backpack:FindFirstChild("BoxTool")
+                if tool then
+                    Humanoid:EquipTool(tool)
+                end
+            end
+        end
+    else
+        -- ไปรับงาน
+        local jobPos = Vector3.new(166.34539794921875, 255.19053649902344, 203.02333068847656)
+        currentTargetPosition = jobPos
+        startPositionCheck(jobPos)
+        
+        walkTo(jobPos, Value)
+        task.wait(0.5)
+        
+        autoApplyJob()
+    end
+end
+
+-- ========== ฟังก์ชันควบคุม ==========
+local function start()
+    if isRunning then return end
+    isRunning = true
+    _G.AutoSevenEleven = true
+    task.spawn(function()
+        while _G.AutoSevenEleven do
+            AutoSevenElevenQuest(true)
+            task.wait(0.1)
+        end
+    end)
+    print("✅ Auto Seven Eleven")
+end
+
+local function stop()
+    _G.AutoSevenEleven = false
+    stopPositionCheck()
+    StopWalkingFunc()
+    isRunning = false
+    currentTargetPosition = nil
+    print("❌ Auto Seven Eleven ")
+end
+
+
+
+
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
@@ -1380,3 +1632,21 @@ FarmTab:Toggle({
     end
 })
 
+FarmTab:Toggle({
+    Title = "Auto Farm Seven Eleven 📦",
+    Desc = "ออโต้ยกกล่อง",
+    Default = false,
+    Callback = function(state)
+        if state then
+            start()
+        else
+            stop()
+        end
+    end
+})
+
+
+return {
+    start = start,
+    stop = stop,
+}
