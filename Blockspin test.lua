@@ -161,14 +161,14 @@ local function CreateTracer(fromPos, toPos)
     shotToggle = not shotToggle
     local distance = (toPos - fromPos).Magnitude
 
-    local part = Instance.new("Part")
-    part.Size = Vector3.new(0.25, 0.25, distance)
-    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)
-    part.Anchored = true
-    part.CanCollide = false
-    part.Material = Enum.Material.Neon
-    part.Color = shotToggle and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
-    part.Parent = workspace
+    local part = Instance.new("Part")  
+    part.Size = Vector3.new(0.25, 0.25, distance)  
+    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)  
+    part.Anchored = true  
+    part.CanCollide = false  
+    part.Material = Enum.Material.Neon  
+    part.Color = shotToggle and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)  
+    part.Parent = workspace  
 
     Debris:AddItem(part, 3)
 end
@@ -206,24 +206,24 @@ local function GetClosestTarget()
     local closest = nil
     local dist = math.huge
 
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and not SavedFriends[v.Name] and v.Character and IsAlive(v.Character) then
-            local targetPart = getPart(v.Character)
-            if targetPart then
-                local pos, onScreen = WorldToViewPoint(targetPart.Position)
-                if onScreen then
-                    local d = GetDistanceStart(
-                        Vector2.new(pos.X, pos.Y),
-                        Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                    )
-                    if d < FOV and d < dist then
-                        closest = v.Character
-                        dist = d
-                    end
-                end
-            end
-        end
-    end
+    for _, v in pairs(Players:GetPlayers()) do  
+        if v ~= LocalPlayer and not SavedFriends[v.Name] and v.Character and IsAlive(v.Character) then  
+            local targetPart = getPart(v.Character)  
+            if targetPart then  
+                local pos, onScreen = WorldToViewPoint(targetPart.Position)  
+                if onScreen then  
+                    local d = GetDistanceStart(  
+                        Vector2.new(pos.X, pos.Y),  
+                        Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
+                    )  
+                    if d < FOV and d < dist then  
+                        closest = v.Character  
+                        dist = d  
+                    end  
+                end  
+            end  
+        end  
+    end  
 
     return closest
 end
@@ -235,41 +235,46 @@ RunService.RenderStepped:Connect(function()
         TargetDot.Visible = false
         return
     end
-    
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    fovCircle.Visible = ShowFOV
 
-    if ShowTracer then
-        local target = GetClosestTarget()
-        if target then
-            local targetPart = getPart(target)
-            if targetPart then
-                local pos, onScreen = WorldToViewPoint(targetPart.Position)
-                if onScreen then
-                    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                    local screenPos = Vector2.new(pos.X, pos.Y)
-                    
-                    tracer.From = center
-                    tracer.To = screenPos
-                    tracer.Visible = true
-                    
-                    TargetDot.Position = screenPos
-                    TargetDot.Visible = true
-                else
-                    tracer.Visible = false
-                    TargetDot.Visible = false
-                end
-            else
-                tracer.Visible = false
-                TargetDot.Visible = false
-            end
-        else
-            tracer.Visible = false
-            TargetDot.Visible = false
-        end
-    else
-        tracer.Visible = false
-        TargetDot.Visible = false
+    -- อัปเดตรัศมี FOV ให้ตรงกับค่าปัจจุบัน
+    if fovCircle.Radius ~= FOV then
+        fovCircle.Radius = FOV
+    end
+
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
+    fovCircle.Visible = ShowFOV  
+
+    if ShowTracer then  
+        local target = GetClosestTarget()  
+        if target then  
+            local targetPart = getPart(target)  
+            if targetPart then  
+                local pos, onScreen = WorldToViewPoint(targetPart.Position)  
+                if onScreen then  
+                    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
+                    local screenPos = Vector2.new(pos.X, pos.Y)  
+                      
+                    tracer.From = center  
+                    tracer.To = screenPos  
+                    tracer.Visible = true  
+                      
+                    TargetDot.Position = screenPos  
+                    TargetDot.Visible = true  
+                else  
+                    tracer.Visible = false  
+                    TargetDot.Visible = false  
+                end  
+            else  
+                tracer.Visible = false  
+                TargetDot.Visible = false  
+            end  
+        else  
+            tracer.Visible = false  
+            TargetDot.Visible = false  
+        end  
+    else  
+        tracer.Visible = false  
+        TargetDot.Visible = false  
     end
 end)
 
@@ -287,10 +292,10 @@ local function getBallisticFlightTime(direction, gravity, speed)
         direction:Dot(direction)
     )
 
-    if r1 and r2 then
-        if r1 > 0 then return math.sqrt(r1) end
-        if r2 > 0 then return math.sqrt(r2) end
-    end
+    if r1 and r2 then  
+        if r1 > 0 then return math.sqrt(r1) end  
+        if r2 > 0 then return math.sqrt(r2) end  
+    end  
 
     return 0
 end
@@ -302,18 +307,18 @@ end
 local function GetVelocity(target, pos)
     local t = tick()
 
-    TargetHistory[target] = TargetHistory[target] or {}
-    local hist = TargetHistory[target]
+    TargetHistory[target] = TargetHistory[target] or {}  
+    local hist = TargetHistory[target]  
 
-    if #hist >= 3 then table.remove(hist, 1) end
-    table.insert(hist, {pos = pos, time = t})
+    if #hist >= 3 then table.remove(hist, 1) end  
+    table.insert(hist, {pos = pos, time = t})  
 
-    if #hist < 2 then return Vector3.zero end
+    if #hist < 2 then return Vector3.zero end  
 
-    local p1 = hist[#hist - 1]
-    local p2 = hist[#hist]
+    local p1 = hist[#hist - 1]  
+    local p2 = hist[#hist]  
 
-    local dt = math.max(p2.time - p1.time, 1e-6)
+    local dt = math.max(p2.time - p1.time, 1e-6)  
     return (p2.pos - p1.pos) / dt
 end
 
@@ -321,60 +326,62 @@ local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = {...}
 
-    if args[1] == "shoot_gun" and SilentAimEnabled then
-        local target = GetClosestTarget()
+    if args[1] == "shoot_gun" and SilentAimEnabled then  
+        local target = GetClosestTarget()  
 
-        if target then
-            local part = getPart(target)
-            if part then
-                local char = LocalPlayer.Character
-                if not char then return OldSend(...) end
+        if target then  
+            local part = getPart(target)  
+            if part then  
+                local char = LocalPlayer.Character  
+                if not char then return OldSend(...) end  
 
-                local root = char:FindFirstChild("HumanoidRootPart")
-                if not root then return OldSend(...) end
+                local root = char:FindFirstChild("HumanoidRootPart")  
+                if not root then return OldSend(...) end  
 
-                local myPos = root.Position
-                local targetPos = part.Position
+                local myPos = root.Position  
+                local targetPos = part.Position  
 
-                local vel = GetVelocity(target, targetPos)
-                local velMagnitude = vel.Magnitude
+                local vel = GetVelocity(target, targetPos)  
+                local velMagnitude = vel.Magnitude  
 
-                local predictedPos
+                local predictedPos  
 
-                if velMagnitude >= HIGH_VEL_THRESHOLD then
-                    predictedPos = targetPos
-                else
-                    local dir = targetPos - myPos
-                    local gravity = Vector3.new(0, -workspace.Gravity, 0)
-                    local speed = 1000
+                if velMagnitude >= HIGH_VEL_THRESHOLD then  
+                    predictedPos = targetPos  
+                else  
+                    local dir = targetPos - myPos  
+                    local gravity = Vector3.new(0, -workspace.Gravity, 0)  
+                    local speed = 1000  
 
-                    local t = getBallisticFlightTime(dir, gravity, speed)
-                    predictedPos = PredictPosition(targetPos, vel, t, gravity)
-                end
+                    local t = getBallisticFlightTime(dir, gravity, speed)  
+                    predictedPos = PredictPosition(targetPos, vel, t, gravity)  
+                end  
 
-                local ignore = {LocalPlayer.Character, target}
-                local behind = IsBehindWall(myPos, predictedPos, ignore)
+                local ignore = {LocalPlayer.Character, target}  
+                local behind = IsBehindWall(myPos, predictedPos, ignore)  
 
-                if behind then
-                    args[3] = CFrame.new(math.huge, math.huge, math.huge)
-                else
-                    args[3] = CFrame.new(myPos, predictedPos)
-                end
+                if behind then  
+                    args[3] = CFrame.new(math.huge, math.huge, math.huge)  
+                else  
+                    args[3] = CFrame.new(myPos, predictedPos)  
+                end  
 
-                for _, v in pairs(args[4] or {}) do
-                    for _, x in pairs(v) do
-                        x.Position = predictedPos
-                        x.Instance = part
-                    end
-                end
+                for _, v in pairs(args[4] or {}) do  
+                    for _, x in pairs(v) do  
+                        x.Position = predictedPos  
+                        x.Instance = part  
+                    end  
+                end  
 
-                CreateTracer(myPos, predictedPos)
-            end
-        end
-    end
+                CreateTracer(myPos, predictedPos)  
+            end  
+        end  
+    end  
 
     return OldSend(table.unpack(args))
 end)
+
+
 
 
 
@@ -1092,6 +1099,7 @@ end
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
+
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = false,
@@ -1115,7 +1123,10 @@ CombatTab:Slider({
     Step = 1,
     Value = {Min = 20, Max = 500},
     Default = 200,
-    Callback = function(v) FOV = v end
+    Callback = function(v)
+        FOV = v
+        fovCircle.Radius = v  
+    end
 })
 
 CombatTab:Dropdown({
