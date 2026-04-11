@@ -1401,3 +1401,107 @@ FarmTab:Toggle({
     end
 })
 
+local CarTab = Window:Tab({ Title = "Car", Icon = "car" })
+
+local bumpConnection = nil
+
+local function BumpAuraLoop()
+    while _G.BumpAura and task.wait(0.1) do
+        local car = Vechine.get_car_player_is_in()
+        if not car or not car:FindFirstChild("DriverSeat") then continue end
+        for _, target in pairs(CharModule.get_all()) do
+            if target ~= Character and target then
+                local hrp = target:FindFirstChild("HumanoidRootPart")
+                if hrp and GetDistanceFromRootPart(hrp) < 100 then
+                    local Assembly = car.DriverSeat.AssemblyLinearVelocity + Vector3.new(65, 65, 65)
+                    Net.send("run_over", car, target, Assembly)
+                end
+            end
+        end
+    end
+end
+
+CarTab:Toggle({
+    Title = "Bump Aura",
+    Default = false,
+    Callback = function(Value)
+        _G.BumpAura = Value
+        if Value then
+            task.spawn(BumpAuraLoop)
+        end
+    end
+})
+
+
+
+local ServerTab = Window:Tab({ Title = "Server", Icon = "server" })
+
+local function GetJobID()
+    return game.JobId or "Unknown"
+end
+
+local ServerCodeLabel = ServerTab:Code({
+    Title = "Current Server",
+    Code = " " .. GetJobID()
+})
+
+ServerTab:Divider()
+ServerTab:Section({ Title = "Server Utilities:" })
+
+local ServerCode = ""
+
+ServerTab:Input({
+    Title = "Enter Server Code",
+    Placeholder = "Paste server JobId here...",
+    Callback = function(Value)
+        ServerCode = Value or ""
+    end
+})
+
+ServerTab:Button({
+    Title = "Join Code",
+    Icon = "log-in",
+    Callback = function()
+        if ServerCode == "" then
+            warn("กรุณาใส่ Server Code")
+            return
+        end
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, ServerCode, game.Players.LocalPlayer)
+    end
+})
+
+ServerTab:Button({
+    Title = "Rejoin",
+    Icon = "refresh-ccw",
+    Callback = function()
+        game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId, game.Players.LocalPlayer)
+    end
+})
+
+ServerTab:Button({
+    Title = "Hop Server (Low Player)",
+    Icon = "shuffle",
+    Callback = function()
+        local HttpService = game:GetService("HttpService")
+        local TeleportService = game:GetService("TeleportService")
+        local servers = {}
+        local success, req = pcall(function()
+            return game:HttpGet(string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100", game.PlaceId))
+        end)
+        if success then
+            local data = HttpService:JSONDecode(req)
+            if data and data.data then
+                for _, v in pairs(data.data) do
+                    if v.playing < v.maxPlayers then
+                        table.insert(servers, v.id)
+                    end
+                end
+            end
+        end
+        if #servers > 0 then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], game.Players.LocalPlayer)
+        else
+            warn("หาเซิร์ฟที่ว่างไม่ได้")
+        end
+    end
+})
