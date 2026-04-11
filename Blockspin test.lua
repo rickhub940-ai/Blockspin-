@@ -981,7 +981,40 @@ CombatTab:Dropdown({
     end
 })
 
+local ModTab = Window:Tab({ Title = "Gun mods", Icon = "airplay" })
 
+local gunModConnection = nil
+
+ModTab:Toggle({
+    Title = "Enable Gun Mods",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if gunModConnection then gunModConnection:Disconnect() end
+            gunModConnection = RunService.RenderStepped:Connect(function()
+                local tool = Character and Character:FindFirstChildWhichIsA("Tool")
+                if tool then
+                    pcall(function()
+                        tool:SetAttribute("fire_rate", getgenv().FireRateGun or 1000)
+                        tool:SetAttribute("accuracy", getgenv().AccuracyGun or 1)
+                        tool:SetAttribute("Recoil", getgenv().RecoilGun or 0)
+                        tool:SetAttribute("Durability", getgenv().DurabilityGun or 1000)
+                    end)
+                end
+            end)
+        else
+            if gunModConnection then
+                gunModConnection:Disconnect()
+                gunModConnection = nil
+            end
+        end
+    end
+})
+
+ModTab:Slider({ Title = "Fire Rate", Step = 1, Value = { Min = 100, Max = 5000, Default = 1000 }, Callback = function(v) getgenv().FireRateGun = v end })
+ModTab:Slider({ Title = "Recoil", Step = 0.1, Value = { Min = 0, Max = 10, Default = 0 }, Callback = function(v) getgenv().RecoilGun = v end })
+ModTab:Slider({ Title = "Accuracy", Step = 0.01, Value = { Min = 0, Max = 1, Default = 1 }, Callback = function(v) getgenv().AccuracyGun = v end })
+ModTab:Slider({ Title = "Durability", Step = 1, Value = { Min = 100, Max = 5000, Default = 1000 }, Callback = function(v) getgenv().DurabilityGun = v end })
 
 local VisualTab = Window:Tab({ Title = "Visual", Icon = "eye" })
 
