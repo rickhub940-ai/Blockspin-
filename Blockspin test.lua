@@ -132,7 +132,7 @@ local SilentAimEnabled = false
 local ShowFOV = false
 local ShowTracer = false
 local FOV = 200
-local HIGH_VEL_THRESHOLD = 250
+local HIGH_VEL_THRESHOLD = 250  
 local HitPart = "Head"
 local SavedFriends = {}
 
@@ -155,6 +155,16 @@ TargetDot.Filled = true
 TargetDot.Visible = false
 
 local shotToggle = false
+
+-- ฟังก์ชันดึงความเร็วกระสุนจากอาวุธที่ถืออยู่
+local function GetBulletSpeed()
+    local char = LocalPlayer.Character
+    if not char then return 1000 end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return 1000 end
+    local speed = tool:GetAttribute("BulletSpeed")
+    return (type(speed) == "number" and speed > 0) and speed or 1000
+end
 
 local function CreateTracer(fromPos, toPos)
     if not SilentAimEnabled then return end
@@ -347,14 +357,13 @@ OldSend = hookfunction(Network.send, function(...)
                 local predictedPos  
 
                 if velMagnitude >= HIGH_VEL_THRESHOLD then  
-                    predictedPos = targetPos  
-                else  
-                    local dir = targetPos - myPos  
-                    local gravity = Vector3.new(0, -workspace.Gravity, 0)  
-                    local speed = 1000  
-
-                    local t = getBallisticFlightTime(dir, gravity, speed)  
-                    predictedPos = PredictPosition(targetPos, vel, t, gravity)  
+                    predictedPos = targetPos  -- ยิงตรง ไม่คำนวณ
+                else
+                    local dir = targetPos - myPos
+                    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+                    local bulletSpeed = GetBulletSpeed()  -- ดึงความเร็วกระสุนจากอาวุธจริง
+                    local t = getBallisticFlightTime(dir, gravity, bulletSpeed)
+                    predictedPos = PredictPosition(targetPos, vel, t, gravity)
                 end  
 
                 local ignore = {LocalPlayer.Character, target}  
@@ -380,6 +389,7 @@ OldSend = hookfunction(Network.send, function(...)
 
     return OldSend(table.unpack(args))
 end)
+
 
 
 
@@ -952,7 +962,7 @@ CombatTab:Slider({
     Default = 200,
     Callback = function(v)
         FOV = v
-        fovCircle.Radius = v  
+        fovCircle.Radius = v  -- อัปเดตรัศมีวง FOV ทันที
     end
 })
 
@@ -980,6 +990,7 @@ CombatTab:Dropdown({
         end
     end
 })
+
 
 local ModTab = Window:Tab({ Title = "Gun mods", Icon = "airplay" })
 
