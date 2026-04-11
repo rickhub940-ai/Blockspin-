@@ -389,179 +389,6 @@ end)
 
 
 
-
--- Esp
-
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-
-local LocalPlayer = Players.LocalPlayer
-local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local LocalHRP = LocalCharacter:WaitForChild("HumanoidRootPart")
-
-local ESPSettings = {
-    Box = false,
-    Name = false,
-    Distance = false,
-    Health = false
-}
-
-local ESP = {}
-ESP.__index = ESP
-
-function ESP.new()
-    return setmetatable({cache = {}}, ESP)
-end
-
-function ESP:createDrawing(type, props)
-    local d = Drawing.new(type)
-    for i,v in pairs(props) do
-        d[i] = v
-    end
-    return d
-end
-
-function ESP:createComponents()
-    return {
-        Box = self:createDrawing("Square", {
-            Thickness = 1,
-            Color = Color3.fromRGB(255,255,255),
-            Filled = false,
-            Visible = false
-        }),
-        Name = self:createDrawing("Text", {
-            Size = 16,
-            Center = true,
-            Outline = true,
-            Visible = false
-        }),
-        Distance = self:createDrawing("Text", {
-            Size = 14,
-            Center = true,
-            Outline = true,
-            Visible = false
-        }),
-        HealthOutline = self:createDrawing("Square", {
-            Thickness = 1,
-            Color = Color3.new(0,0,0),
-            Filled = false,
-            Visible = false
-        }),
-        Health = self:createDrawing("Square", {
-            Thickness = 1,
-            Filled = true,
-            Visible = false
-        })
-    }
-end
-
-function ESP:update(comp, char, plr)
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-
-    local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-    if not onScreen then
-        self:hide(comp)
-        return
-    end
-
-    local dist = (LocalHRP.Position - hrp.Position).Magnitude
-
-    local scale = 1 / (pos.Z * math.tan(math.rad(Camera.FieldOfView/2)) * 2) * 100
-    local w = math.floor(Camera.ViewportSize.Y / 25 * scale)
-    local h = math.floor(Camera.ViewportSize.X / 27 * scale)
-
-    local boxPos = Vector2.new(pos.X - w/2, pos.Y - h/2)
-
-    comp.Box.Visible = ESPSettings.Box
-    if ESPSettings.Box then
-        comp.Box.Size = Vector2.new(w,h)
-        comp.Box.Position = boxPos
-    end
-
-    comp.Name.Visible = ESPSettings.Name
-    if ESPSettings.Name then
-        comp.Name.Text = plr.Name
-        comp.Name.Position = Vector2.new(pos.X, pos.Y - h/2 - 14)
-        if plr.Team and plr.TeamColor then
-            comp.Name.Color = plr.TeamColor.Color
-        else
-            comp.Name.Color = Color3.fromRGB(255,255,255)
-        end
-    end
-
-    comp.Distance.Visible = ESPSettings.Distance
-    if ESPSettings.Distance then
-        comp.Distance.Text = "["..math.floor(dist).."]"
-        comp.Distance.Position = Vector2.new(pos.X, pos.Y + h/2 + 2)
-    end
-
-    comp.Health.Visible = ESPSettings.Health
-    comp.HealthOutline.Visible = ESPSettings.Health
-
-    if ESPSettings.Health then
-        local hp = hum.Health / hum.MaxHealth
-        comp.HealthOutline.Size = Vector2.new(4,h)
-        comp.HealthOutline.Position = Vector2.new(boxPos.X - 6, boxPos.Y)
-        comp.Health.Size = Vector2.new(2, h * hp)
-        comp.Health.Position = Vector2.new(boxPos.X - 5, boxPos.Y + h*(1-hp))
-        comp.Health.Color = Color3.fromRGB(255*(1-hp),255*hp,0)
-    end
-end
-
-function ESP:hide(comp)
-    for _,v in pairs(comp) do
-        if typeof(v) == "table" then
-            for _,x in pairs(v) do x.Visible = false end
-        else
-            v.Visible = false
-        end
-    end
-end
-
-function ESP:remove(plr)
-    local comp = self.cache[plr]
-    if comp then
-        for _,v in pairs(comp) do
-            if typeof(v) == "table" then
-                for _,x in pairs(v) do x:Remove() end
-            else
-                v:Remove()
-            end
-        end
-        self.cache[plr] = nil
-    end
-end
-
-local esp = ESP.new()
-
-local function updateESP()
-    if not ESPSettings.Box and not ESPSettings.Name and not ESPSettings.Distance and not ESPSettings.Health then
-        return
-    end
-    for _,plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            local char = plr.Character
-            if char then
-                if not esp.cache[plr] then
-                    esp.cache[plr] = esp:createComponents()
-                end
-                esp:update(esp.cache[plr], char, plr)
-            end
-        end
-    end
-end
-espConnection = RunService.RenderStepped:Connect(updateESP)
-
-Players.PlayerRemoving:Connect(function(plr)
-    esp:remove(plr)
-end)
-
-
-
 -- Esp items 
 
 local Players = game:GetService("Players")
@@ -1155,41 +982,202 @@ CombatTab:Dropdown({
 })
 
 
-local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
-EspTab:Toggle({
-    Title = "ESP Box",
-    Default = false,
-    Callback = function(v)
-        ESPSettings.Box = v
-    end
-})
+local VisualTab = Window:Tab({ Title = "Visual", Icon = "eye" })
 
-EspTab:Toggle({
+-- ESP Name
+local nameConnection = nil
+VisualTab:Toggle({
     Title = "ESP Name",
     Default = false,
     Callback = function(v)
-        ESPSettings.Name = v
+        if v then
+            if nameConnection then nameConnection:Disconnect() end
+            nameConnection = RunService.RenderStepped:Connect(function()
+                for player, name in pairs(Names) do
+                    local char = player.Character
+                    local head = char and char:FindFirstChild("Head")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if head and hum and hum.Health > 0 then
+                        local pos, visible = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,0.5,0))
+                        if visible then
+                            name.Text = player.Name
+                            name.Position = Vector2.new(pos.X, pos.Y)
+                            name.Visible = true
+                        else
+                            name.Visible = false
+                        end
+                    else
+                        name.Visible = false
+                    end
+                end
+            end)
+        else
+            if nameConnection then nameConnection:Disconnect(); nameConnection = nil end
+            for _, name in pairs(Names) do name.Visible = false end
+        end
     end
 })
 
-EspTab:Toggle({
-    Title = "ESP Distance",
+-- ESP Box
+local boxConnection = nil
+VisualTab:Toggle({
+    Title = "ESP Box",
     Default = false,
     Callback = function(v)
-        ESPSettings.Distance = v
+        if v then
+            if boxConnection then boxConnection:Disconnect() end
+            boxConnection = RunService.RenderStepped:Connect(function()
+                for player, box in pairs(Boxes) do
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+                        if visible then
+                            local scale = (Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0)).Y - Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0,3,0)).Y)
+                            box.Size = Vector2.new(math.abs(scale) * 0.6, math.abs(scale))
+                            box.Position = Vector2.new(pos.X - (math.abs(scale) * 0.6)/2, pos.Y - math.abs(scale)/2)
+                            box.Visible = true
+                        else
+                            box.Visible = false
+                        end
+                    else
+                        box.Visible = false
+                    end
+                end
+            end)
+        else
+            if boxConnection then boxConnection:Disconnect(); boxConnection = nil end
+            for _, box in pairs(Boxes) do box.Visible = false end
+        end
     end
 })
 
-EspTab:Toggle({
+-- ESP Health
+local healthConnection = nil
+VisualTab:Toggle({
     Title = "ESP Health",
     Default = false,
     Callback = function(v)
-        ESPSettings.Health = v
+        if v then
+            if healthConnection then healthConnection:Disconnect() end
+            healthConnection = RunService.RenderStepped:Connect(function()
+                for player, bar in pairs(HealthBars) do
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+                        if visible then
+                            local top = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0,3,0))
+                            local bottom = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
+                            local height = math.abs(top.Y - bottom.Y)
+                            local healthPercent = hum.Health / hum.MaxHealth
+                            local x = pos.X - (height * 0.35)
+                            bar.From = Vector2.new(x, bottom.Y)
+                            bar.To = Vector2.new(x, bottom.Y - (height * healthPercent))
+                            bar.Color = Color3.fromRGB(255 - (255 * healthPercent), 255 * healthPercent, 0)
+                            bar.Visible = true
+                        else
+                            bar.Visible = false
+                        end
+                    else
+                        bar.Visible = false
+                    end
+                end
+            end)
+        else
+            if healthConnection then healthConnection:Disconnect(); healthConnection = nil end
+            for _, bar in pairs(HealthBars) do bar.Visible = false end
+        end
     end
 })
 
-local ItemsESPToggle = EspTab:Toggle({
+-- ESP Highlight (ส่องทะลุ)
+VisualTab:Toggle({
+    Title = "ESP Highlight",
+    Default = false,
+    Callback = function(v)
+        for player, hl in pairs(Highlights) do
+            hl.Enabled = v
+        end
+    end
+})
+
+-- ESP Distance
+local distanceConnection = nil
+VisualTab:Toggle({
+    Title = "ESP Distance",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if distanceConnection then distanceConnection:Disconnect() end
+            distanceConnection = RunService.RenderStepped:Connect(function()
+                for player, text in pairs(Distances) do
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 and LocalPlayer.Character then
+                        local pos, visible = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
+                        if visible then
+                            local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                            text.Text = distance.."m"
+                            text.Position = Vector2.new(pos.X, pos.Y)
+                            text.Visible = true
+                        else
+                            text.Visible = false
+                        end
+                    else
+                        text.Visible = false
+                    end
+                end
+            end)
+        else
+            if distanceConnection then distanceConnection:Disconnect(); distanceConnection = nil end
+            for _, text in pairs(Distances) do text.Visible = false end
+        end
+    end
+})
+
+-- ESP Tracer
+local tracerConnection = nil
+VisualTab:Toggle({
+    Title = "ESP Tracer",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if tracerConnection then tracerConnection:Disconnect() end
+            tracerConnection = RunService.RenderStepped:Connect(function()
+                for player, line in pairs(Tracers) do
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local hum = char and char:FindFirstChildOfClass("Humanoid")
+                    if hrp and hum and hum.Health > 0 then
+                        local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+                        if visible then
+                            local screenCenterX = Camera.ViewportSize.X / 2
+                            line.From = Vector2.new(screenCenterX, 0)
+                            line.To = Vector2.new(pos.X, pos.Y)
+                            line.Visible = true
+                        else
+                            line.Visible = false
+                        end
+                    else
+                        line.Visible = false
+                    end
+                end
+            end)
+        else
+            if tracerConnection then tracerConnection:Disconnect(); tracerConnection = nil end
+            for _, line in pairs(Tracers) do line.Visible = false end
+        end
+    end
+})
+
+
+
+local ItemsESPToggle = VisualTab:Toggle({
     Title = "Items Invectorry ESP",
     Default = false,
     Callback = function(state)
