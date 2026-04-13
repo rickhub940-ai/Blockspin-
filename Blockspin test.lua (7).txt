@@ -748,6 +748,8 @@ end)
 
 -- farm 7-11
 
+
+-- Auto Seven Eleven Quest (สมบูรณ์ รองรับการเกิดใหม่เมื่อตาย)
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -798,6 +800,28 @@ workspace.DescendantAdded:Connect(function(descendant)
     end
 end)
 
+-- ========== อัปเดตตัวละครใหม่เมื่อเกิดใหม่ ==========
+local function updateCharacter()
+    Character = Client.Character or Client.CharacterAdded:Wait()
+    Humanoid = Character:WaitForChild("Humanoid")
+    RootPart = Character:WaitForChild("HumanoidRootPart")
+    Backpack = Client:WaitForChild("Backpack")
+    print("🔄 อัปเดตตัวละครใหม่ (เกิดใหม่แล้ว)")
+end
+
+-- ตรวจจับการตายและรอเกิดใหม่
+Client.CharacterAdded:Connect(function(newChar)
+    print("💀 ตัวละครตาย! กำลังรอเกิดใหม่...")
+    task.wait(2)
+    Character = newChar
+    Humanoid = Character:WaitForChild("Humanoid")
+    RootPart = Character:WaitForChild("HumanoidRootPart")
+    Backpack = Client:WaitForChild("Backpack")
+    StopWalking = false
+    currentTargetPosition = nil
+    print("✅ เกิดใหม่แล้ว พร้อมทำงานต่อ")
+end)
+
 -- ========== ฟังก์ชันกดรับงานผ่าน UI ==========
 local function autoApplyJob()
     if Client:GetAttribute("Job") == "shelf_stocker" then 
@@ -829,6 +853,7 @@ end
 local function walkTo(destination, value)
     if not value then return end
     if not destination then return end
+    if not RootPart then updateCharacter() end
     
     currentTargetPosition = destination
     
@@ -846,7 +871,7 @@ local function walkTo(destination, value)
     if success and path.Status == Enum.PathStatus.Success then
         for _, wp in ipairs(path:GetWaypoints()) do
             if StopWalking or not _G.AutoSevenEleven then return end
-            if Humanoid.Health <= 0 then break end
+            if Humanoid and Humanoid.Health <= 0 then break end
             
             local finished = false
             local conn
@@ -876,7 +901,7 @@ local function startPositionCheck(targetPos)
     checkDistanceTask = task.spawn(function()
         while _G.AutoSevenEleven and targetPos do
             task.wait(0.5)
-            if targetPos and dist(targetPos) > 4 and not StopWalking then
+            if RootPart and targetPos and dist(targetPos) > 4 and not StopWalking then
                 print("⚠️ กระเด็นออกจากตำแหน่ง กำลังเดินกลับ...")
                 walkTo(targetPos, true)
             end
@@ -894,7 +919,9 @@ end
 -- ========== ฟังก์ชันหยุดเดิน ==========
 local function StopWalkingFunc()
     StopWalking = true
-    Humanoid:MoveTo(RootPart.Position)
+    if Humanoid then
+        Humanoid:MoveTo(RootPart.Position)
+    end
     task.wait(0.1)
     StopWalking = false
 end
@@ -906,6 +933,14 @@ local function AutoSevenElevenQuest(Value)
         stopPositionCheck()
         return 
     end
+    
+    -- อัปเดตตัวละครทุกครั้งก่อนทำงาน
+    if not RootPart or not Humanoid or Humanoid.Health <= 0 then
+        updateCharacter()
+        task.wait(1)
+    end
+    
+    if not RootPart or not Humanoid then return end
     
     if Client:GetAttribute("Job") == "shelf_stocker" then
         if not Backpack:FindFirstChild("BoxTool") and not Character:FindFirstChild("BoxTool") then
@@ -976,6 +1011,7 @@ local function start()
     if isRunning then return end
     isRunning = true
     _G.AutoSevenEleven = true
+    updateCharacter() -- อัปเดตตัวละครก่อนเริ่ม
     task.spawn(function()
         while _G.AutoSevenEleven do
             AutoSevenElevenQuest(true)
@@ -991,10 +1027,8 @@ local function stop()
     StopWalkingFunc()
     isRunning = false
     currentTargetPosition = nil
-    print("❌ Auto Seven Eleven ")
+    print("❌ Auto Seven Eleven")
 end
-
-
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
@@ -1255,20 +1289,8 @@ local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
 FarmTab:Divider()
 
 FarmTab:Toggle({
-    Title = "Auto Farm Janitor 🪣🧹",
-    Desc = "",
-    Default = false,
-    Callback = function(state)
-        JanitorSettings.Enabled = state
-        if state then
-            task.spawn(startAutoFarm)
-        end
-    end
-})
-
-FarmTab:Toggle({
-    Title = "Auto Farm Seven Eleven 📦",
-    Desc = "ออโต้ยกกล่อง",
+    Title = "Auto Seven Eleven",
+    Desc = "ทำงานเซเว่นอัตโนมัติ",
     Default = false,
     Callback = function(state)
         if state then
@@ -1284,3 +1306,4 @@ return {
     start = start,
     stop = stop,
 }
+
