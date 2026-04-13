@@ -1233,21 +1233,6 @@ ChaterTab:Divider()
 
 ChaterTab:Section({Title = "Mod"})
 
-ChaterTab:Button({
-    Title = "มุดดิน",
-    Callback = function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            hrp.CFrame = hrp.CFrame + Vector3.new(0, -55, 0)
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "มุดดิ",
-                Text = "มนดนพน",
-                Duration = 2
-            })
-        end
-    end
-})
 
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
@@ -1279,7 +1264,50 @@ ChaterTab:Toggle({
 })
 
 
+-- Services ที่จำเป็น
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- โมดูลที่ต้องใช้
+local RagdollModule = require(ReplicatedStorage.Modules.Core.Ragdoll)
+local Net = require(ReplicatedStorage.Modules.Core.Net)
+
+-- ตัวแปรสำหรับ Anti Ragdoll
+local player = Players.LocalPlayer
+
+-- อันติแรคดอล
+local function AntiRagdollLoop()
+    while _G.AntiRagdoll do
+        task.wait(0.1)
+
+        pcall(function()
+            local isRagdolled = RagdollModule.is_ragdolling.get()
+            if isRagdolled then
+                RagdollModule.is_ragdolling.set(false)
+                
+                pcall(function() Net.send("end_ragdoll_early") end)
+                pcall(function() Net.send("clear_ragdoll") end)
+                pcall(function() Net.get("end_ragdoll_early") end)
+                pcall(function() Net.get("clear_ragdoll") end)
+            end
+        end)
+    end
+end
+
+
+ChaterTab:Toggle({
+    Title = "Anti Ragdoll(กันล้ม)",
+    Flag = "AntiRagdoll",
+    Value = false,
+    Callback = function(Value)
+        _G.AntiRagdoll = Value
+
+        if Value then
+            task.spawn(AntiRagdollLoop)
+        end
+    end
+})
 
 
 local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
