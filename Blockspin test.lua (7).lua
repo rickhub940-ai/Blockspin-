@@ -1,5 +1,394 @@
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
 
+local SPEED = 260
+local SPEED_MIN = 10
+local SPEED_MAX = 500
+local DEBOUNCE = 0.35
+local SMOOTH = 0
+
+local UI_WIDTH = 132
+local UI_HEIGHT = 44
+local SPEEDBOX_W = 56
+local SPEEDBOX_H = 14
+
+local freecam = false
+local dummy = nil
+local char, humanoid, hrp = nil, nil, nil
+local saved = {}
+local pendingStamp = 0
+local allowMovement = false
+local initialDummyCFrame = nil
+local initialCameraCFrame = nil
+local initialDistance = nil
+local savedPartAnchors = {}
+local savedPlatformStand = nil
+local yaw = 0
+local pitch = 0
+local ROT_SENS = 0.0025
+local lastInputPos = Vector2.new(0,0)
+local ignoreNextInput = false
+
+local function safeSet(fn, ...)
+    local ok, err = pcall(fn, ...)
+    if not ok then warn("Spectator: safeSet error:", err) end
+end
+
+local function createGui()
+    if playerGui:FindFirstChild("SpectatorCleanGUI") then
+        local g = playerGui.SpectatorCleanGUI
+        return {Gui = g, Frame = g.Container, Toggle = g.Container.Toggle, SpeedBox = g.Container.SpeedBox, Info = g.Container.Info}
+    end
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "SpectatorCleanGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = playerGui
+    local frame = Instance.new("Frame")
+    frame.Name = "Container"
+    frame.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)
+    frame.Position = UDim2.new(0, 8, 0, 8)
+    frame.BackgroundColor3 = Color3.fromRGB(18,20,24)
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0,6)
+    local stroke = Instance.new("UIStroke", frame)
+    stroke.Color = Color3.fromRGB(45,50,60); stroke.Transparency = 0.7; stroke.Thickness = 1
+    local title = Instance.new("TextLabel", frame)
+    title.Name = "Title"
+    title.Size = UDim2.new(0.64, 0, 0, 22)
+    title.Position = UDim2.new(0, 8, 0, 6)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 12
+    title.TextColor3 = Color3.fromRGB(235,235,235)
+    title.Text = "Free camera"
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    local toggle = Instance.new("TextButton", frame)
+    toggle.Name = "Toggle"
+    toggle.Size = UDim2.new(0.32, -8, 0, 22)
+    toggle.Position = UDim2.new(0.62, 0, 0, 6)
+    toggle.BackgroundColor3 = Color3.fromRGB(36,40,48)
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 12
+    toggle.Text = "OFF"
+    toggle.TextColor3 = Color3.fromRGB(220,220,220)
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0,6)
+    Instance.new("UIStroke", toggle).Color = Color3.fromRGB(60,70,80)
+    local speedBox = Instance.new("TextBox", frame)
+    speedBox.Name = "SpeedBox"
+    speedBox.Size = UDim2.new(0, SPEEDBOX_W, 0, SPEEDBOX_H)
+    speedBox.Position = UDim2.new(0, 8, 1, -18)
+    speedBox.BackgroundColor3 = Color3.fromRGB(34,38,46)
+    speedBox.PlaceholderText = tostring(SPEED)
+    speedBox.Text = ""
+    speedBox.Font = Enum.Font.Gotham
+    speedBox.TextSize = 12
+    speedBox.TextColor3 = Color3.fromRGB(235,235,235)
+    Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0,5)
+    local sbstroke = Instance.new("UIStroke", speedBox)
+    sbstroke.Color = Color3.fromRGB(55,65,75); sbstroke.Transparency = 0.8
+    local info = Instance.new("TextLabel", frame)
+    info.Name = "Info"
+    info.Size = UDim2.new(1, -10, 0, 10)
+    info.Position = UDim2.new(0, 5, 1, -10)
+    info.BackgroundTransparency = 1
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 10
+    info.TextColor3 = Color3.fromRGB(210,195,110)
+    info.Text = ""
+    return {Gui = screenGui, Frame = frame, Toggle = toggle, SpeedBox = speedBox, Info = info}
+end
+
+local gui = createGui()
+local toggleBtn = gui.Toggle
+local speedBox = gui.SpeedBox
+local infoLabel = gui.Info
+
+local function makeDummy()
+    local name = "SpecDummy_" .. player.UserId
+    local ex = workspace:FindFirstChild(name)
+    if ex then
+        safeSet(function()
+            if ex:IsA("BasePart") then
+                ex.Anchored = true
+                ex.CanCollide = false
+                ex.Transparency = 1
+            end
+        end)
+        return ex
+    end
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = Vector3.new(1,1,1)
+    p.Anchored = true
+    p.CanCollide = false
+    p.Transparency = 1
+    p.Parent = workspace
+    return p
+end
+
+local function saveHumanoidValues(h)
+    if not h then return end
+    saved.WalkSpeed = h.WalkSpeed
+    saved.JumpPower = h.JumpPower
+    saved.AutoRotate = h.AutoRotate
+end
+
+local function restoreHumanoidValues(h)
+    if not h then return end
+    safeSet(function() if saved.WalkSpeed then h.WalkSpeed = saved.WalkSpeed end end)
+    safeSet(function() if saved.JumpPower then h.JumpPower = saved.JumpPower end end)
+    safeSet(function() if saved.AutoRotate ~= nil then h.AutoRotate = saved.AutoRotate end end)
+end
+
+local function setInfo(text)
+    if infoLabel and infoLabel.Parent then
+        infoLabel.Text = tostring(text or "")
+        delay(1.2, function()
+            if infoLabel and infoLabel.Parent then infoLabel.Text = "" end
+        end)
+    end
+end
+
+local function tryApplySpeed(txt)
+    if not txt or txt == "" then return end
+    local n = tonumber(txt)
+    if not n then setInfo("Invalid number"); return end
+    n = math.clamp(n, SPEED_MIN, SPEED_MAX)
+    SPEED = n
+    speedBox.PlaceholderText = tostring(SPEED)
+    speedBox.Text = ""
+    setInfo("Speed set: " .. tostring(SPEED))
+end
+
+local function anchorAllCharacterParts(character)
+    savedPartAnchors = {}
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            savedPartAnchors[part] = part.Anchored
+            safeSet(function()
+                if part.AssemblyLinearVelocity then part.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+                if part.AssemblyAngularVelocity then part.AssemblyAngularVelocity = Vector3.new(0,0,0) end
+                part.Anchored = true
+            end)
+        end
+    end
+end
+
+local function restoreAllCharacterParts()
+    for part, prev in pairs(savedPartAnchors) do
+        safeSet(function()
+            if part and part.Parent then
+                part.Anchored = (prev == true)
+            end
+        end)
+    end
+    savedPartAnchors = {}
+end
+
+UserInputService.InputChanged:Connect(function(input, processed)
+    if not freecam then return end
+    if allowMovement then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        local pos
+        if input.Position and typeof(input.Position) == "Vector2" then
+            pos = input.Position
+        else
+            pos = UserInputService:GetMouseLocation()
+        end
+        if ignoreNextInput then
+            lastInputPos = pos
+            ignoreNextInput = false
+            return
+        end
+        local d = pos - lastInputPos
+        lastInputPos = pos
+        yaw = yaw - d.X * ROT_SENS
+        pitch = math.clamp(pitch - d.Y * ROT_SENS, -math.rad(89), math.rad(89))
+    end
+end)
+
+local function startSpectator()
+    char = player.Character or player.CharacterAdded:Wait()
+    humanoid = char:FindFirstChildOfClass("Humanoid")
+    hrp = char:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp then warn("Spectator: no humanoid/hrp"); return end
+    dummy = makeDummy()
+    local camCFrame = camera.CFrame
+    dummy.CFrame = camCFrame
+    initialDummyCFrame = dummy.CFrame
+    initialCameraCFrame = camCFrame
+    local rel = (camera.CFrame.Position - dummy.Position)
+    local r = rel.Magnitude
+    initialDistance = math.max(r, 1)
+    local look = rel.Unit
+    yaw = math.atan2(look.X, look.Z)
+    pitch = math.asin(math.clamp(look.Y, -1, 1))
+    saveHumanoidValues(humanoid)
+    anchorAllCharacterParts(char)
+    savedPlatformStand = humanoid.PlatformStand
+    safeSet(function() humanoid.PlatformStand = true end)
+    safeSet(function() humanoid.WalkSpeed = 0 end)
+    safeSet(function() humanoid.JumpPower = 0 end)
+    safeSet(function() humanoid.AutoRotate = false end)
+    savedCameraFOV = camera.FieldOfView or 70
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.FieldOfView = savedCameraFOV
+    lastInputPos = UserInputService:GetMouseLocation()
+    ignoreNextInput = true
+    freecam = true
+    toggleBtn.Text = "ON"
+    toggleBtn.TextColor3 = Color3.fromRGB(120,235,120)
+    allowMovement = false
+    setInfo("Locked. Move to unlock.")
+end
+
+local function stopSpectator()
+    freecam = false
+    local targetHum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if targetHum then
+        camera.CameraType = Enum.CameraType.Custom
+        camera.CameraSubject = targetHum
+    else
+        camera.CameraType = Enum.CameraType.Custom
+    end
+    if savedCameraFOV then
+        safeSet(function() camera.FieldOfView = savedCameraFOV end)
+        savedCameraFOV = nil
+    end
+    initialDistance = nil
+    initialDummyCFrame = nil
+    initialCameraCFrame = nil
+    lastInputPos = Vector2.new(0,0)
+    ignoreNextInput = false
+    safeSet(function()
+        if humanoid and humanoid.Parent then
+            if savedPlatformStand ~= nil then
+                humanoid.PlatformStand = savedPlatformStand
+            else
+                humanoid.PlatformStand = false
+            end
+        end
+    end)
+    savedPlatformStand = nil
+    restoreAllCharacterParts()
+    if dummy and dummy.Parent then
+        safeSet(function() dummy:Destroy() end)
+        dummy = nil
+    end
+    if humanoid then restoreHumanoidValues(humanoid) end
+    toggleBtn.Text = "OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(220,220,220)
+    setInfo("Disabled")
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    if not freecam then return end
+    if not dummy then return end
+    if not allowMovement and initialDummyCFrame and initialCameraCFrame and initialDistance then
+        safeSet(function() dummy.CFrame = initialDummyCFrame end)
+        for part, _ in pairs(savedPartAnchors) do
+            safeSet(function()
+                if part and part.Parent then
+                    if part.AssemblyLinearVelocity then part.AssemblyLinearVelocity = Vector3.new(0,0,0) end
+                    if part.AssemblyAngularVelocity then part.AssemblyAngularVelocity = Vector3.new(0,0,0) end
+                    part.Anchored = true
+                end
+            end)
+        end
+        local lx = math.sin(yaw) * math.cos(pitch)
+        local ly = math.sin(pitch)
+        local lz = math.cos(yaw) * math.cos(pitch)
+        local lookFromDummy = Vector3.new(lx, ly, lz)
+        local camPos = dummy.Position + lookFromDummy * initialDistance
+        safeSet(function() camera.CFrame = CFrame.new(camPos, dummy.Position) end)
+        if savedCameraFOV and camera.FieldOfView > savedCameraFOV then
+            camera.FieldOfView = savedCameraFOV
+        end
+        local md = (humanoid and humanoid.MoveDirection) or Vector3.new()
+        local mdMag = md.Magnitude
+        local kbVec = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then kbVec = kbVec + camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then kbVec = kbVec - camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then kbVec = kbVec - camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then kbVec = kbVec + camera.CFrame.RightVector end
+        local kbMag = kbVec.Magnitude
+        local JOYSTICK_THRESHOLD = 0.14
+        if mdMag > JOYSTICK_THRESHOLD or kbMag > 0.01 then
+            allowMovement = true
+            camera.CameraType = Enum.CameraType.Custom
+            camera.CameraSubject = dummy
+            setInfo("Unlocked")
+        end
+        return
+    end
+    if camera.CameraSubject ~= dummy then safeSet(function() camera.CameraSubject = dummy end) end
+    if savedCameraFOV and camera.FieldOfView > savedCameraFOV then camera.FieldOfView = savedCameraFOV end
+    local md = (humanoid and humanoid.MoveDirection) or Vector3.new()
+    local mdMag = md.Magnitude
+    local kbVec = Vector3.new()
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) or UserInputService:IsKeyDown(Enum.KeyCode.Up) then kbVec = kbVec + camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) or UserInputService:IsKeyDown(Enum.KeyCode.Down) then kbVec = kbVec - camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) or UserInputService:IsKeyDown(Enum.KeyCode.Left) then kbVec = kbVec - camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) or UserInputService:IsKeyDown(Enum.KeyCode.Right) then kbVec = kbVec + camera.CFrame.RightVector end
+    local kbMag = kbVec.Magnitude
+    local moveVec
+    if mdMag > 0.001 and humanoid then
+        local camForward = camera.CFrame.LookVector
+        local forwardFlat = Vector3.new(camForward.X, 0, camForward.Z)
+        if forwardFlat.Magnitude < 1e-6 then forwardFlat = Vector3.new(0,0,-1) end
+        forwardFlat = forwardFlat.Unit
+        local camRight = camera.CFrame.RightVector
+        local xAxis = md:Dot(camRight)
+        local zAxis = md:Dot(forwardFlat)
+        moveVec = (camRight * xAxis) + (camera.CFrame.LookVector * zAxis)
+    else
+        moveVec = kbVec
+    end
+    if moveVec.Magnitude < 1e-6 then return end
+    local appliedSpeed = math.clamp(SPEED, SPEED_MIN, SPEED_MAX)
+    local displacement = moveVec.Unit * appliedSpeed * dt * math.clamp(mdMag, 0, 1)
+    local newC = dummy.CFrame + displacement
+    if SMOOTH and SMOOTH > 0 then
+        dummy.CFrame = dummy.CFrame:Lerp(newC, math.clamp(SMOOTH*60*dt, 0, 1))
+    else
+        dummy.CFrame = newC
+    end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if freecam then stopSpectator() else startSpectator() end
+end)
+
+speedBox:GetPropertyChangedSignal("Text"):Connect(function()
+    pendingStamp = tick()
+    local stamp = pendingStamp
+    delay(DEBOUNCE, function()
+        if pendingStamp == stamp then tryApplySpeed(speedBox.Text) end
+    end)
+end)
+speedBox.FocusLost:Connect(function()
+    tryApplySpeed(speedBox.Text)
+end)
+
+player.CharacterAdded:Connect(function(c)
+    if savedPlatformStand ~= nil and humanoid and humanoid.Parent then
+        safeSet(function() humanoid.PlatformStand = savedPlatformStand end)
+        savedPlatformStand = nil
+    end
+    if next(savedPartAnchors) then restoreAllCharacterParts() end
+    char = c
+    humanoid = c:FindFirstChildOfClass("Humanoid")
+    hrp = c:FindFirstChild("HumanoidRootPart")
+    if freecam then stopSpectator() end
+end)
+
+speedBox.PlaceholderText = tostring(SPEED)
 
 
 local WindUI = loadstring(game:HttpGet(
@@ -1329,9 +1718,4 @@ FarmTab:Toggle({
     end
 })
 
-
-return {
-    start = start,
-    stop = stop,
-}
 
