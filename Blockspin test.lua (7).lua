@@ -1030,6 +1030,150 @@ local function stop()
 end
 
 
+
+-- Esp anti aim
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+local IMAGEAntiaim_ID = "rbxassetid://94861926327838"
+local EspVelocit_limit = 200
+local RATIO_LIMIT = 0.35
+local MIN_MOVE = 2
+local DETECT_FRAMES = 3
+
+local AntiAimEnabled = false
+
+local ESPsAntiAim = {}
+local LastData = {}
+local Flags = {}
+
+local function createESP(char, player)
+    if ESPsAntiAim[player] then return end
+
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0, 60, 0, 60)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = head
+    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+
+    local img = Instance.new("ImageLabel")
+    img.Size = UDim2.new(0, 45, 0, 45)
+    img.Position = UDim2.new(0.5, -22, 0, 0)
+    img.BackgroundTransparency = 1
+    img.Image = IMAGEAntiaim_ID
+    img.Parent = billboard
+
+    billboard.Parent = head
+
+    ESPsAntiAim[player] = {
+        gui = billboard,
+        img = img,
+        t = 0
+    }
+end
+
+local function removeESP(player)
+    if ESPsAntiAim[player] then
+        ESPsAntiAim[player].gui:Destroy()
+        ESPsAntiAim[player] = nil
+    end
+end
+
+local function clearAllESP()
+    for player in pairs(ESPsAntiAim) do
+        removeESP(player)
+    end
+end
+
+function updateAllESPVisibility()
+    if not AntiAimEnabled then
+        clearAllESP()
+    end
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    if not AntiAimEnabled then return end
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+
+                local hrp = char.HumanoidRootPart
+                local pos = hrp.Position
+                local vel = hrp.Velocity.Magnitude
+
+                local last = LastData[player]
+                local suspicious = false
+
+                if last then
+                    local distance = (pos - last.pos).Magnitude
+                    local expected = vel * dt
+
+                    local ratio = 1
+                    if expected > 0 then
+                        ratio = distance / expected
+                    end
+
+                    if vel > EspVelocit_limit then
+                        suspicious = true
+                    end
+
+                    if vel > EspVelocit_limit and distance < MIN_MOVE then
+                        suspicious = true
+                    end
+
+                    if vel > EspVelocit_limit and ratio < RATIO_LIMIT then
+                        suspicious = true
+                    end
+                end
+
+                Flags[player] = Flags[player] or 0
+
+                if suspicious then
+                    Flags[player] += 1
+                else
+                    Flags[player] = 0
+                end
+
+                if Flags[player] >= DETECT_FRAMES then
+                    createESP(char, player)
+                else
+                    removeESP(player)
+                end
+
+                LastData[player] = {pos = pos}
+            else
+                removeESP(player)
+                LastData[player] = nil
+                Flags[player] = nil
+            end
+        end
+    end
+
+    for _, data in pairs(ESPsAntiAim) do
+        data.t += dt * 3
+        local offset = math.sin(data.t) * 5
+        data.img.Position = UDim2.new(0.5, -22, 0, offset)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+    LastData[player] = nil
+    Flags[player] = nil
+end)
+
+
+
+
+
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
@@ -1154,6 +1298,16 @@ local ItemsESPToggle = EspTab:Toggle({
     end
 })
 
+
+EspTab:Toggle({
+    Title = "ESP Anti aim",
+    Desc = "แสดงคนที่เปิดกันล็อค",
+    Default = false,
+    Callback = function(state)
+        AntiAimEnabled = state
+        updateAllESPVisibility()
+    end
+})
 
 
 local ChaterTab = Window:Tab({Title = "Character", Icon = "user"})
@@ -1327,6 +1481,21 @@ FarmTab:Toggle({
         end
     end
 })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 local Players = game:GetService("Players")
