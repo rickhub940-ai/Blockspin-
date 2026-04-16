@@ -1527,6 +1527,85 @@ ChaterTab:Toggle({
 
 
 
+-- มุดดิน
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local Client = Players.LocalPlayer
+local Char = require(ReplicatedStorage.Modules.Core.Char)
+
+local EnabledSnapRunning = false
+local YoffsetValue = 10
+local snapThread = nil
+
+local function GetDeltaY(baseY, currentY, offset)
+    return (baseY - offset) - currentY
+end
+
+local function SetSnapState(state)
+    EnabledSnapRunning = state
+    getgenv().Snap = state
+
+    if snapThread then
+        task.cancel(snapThread)
+        snapThread = nil
+    end
+
+    if state then
+        snapThread = task.spawn(function()
+            local baseY = nil
+
+            while EnabledSnapRunning do
+                task.wait(0.01)
+
+                local char = Char.get()
+                local hrp = Char.get_hrp()
+
+                if char and hrp then
+                    if not baseY then
+                        baseY = hrp.Position.Y
+                    end
+
+                    local currentY = hrp.Position.Y
+                    local deltaY = GetDeltaY(baseY, currentY, YoffsetValue)
+
+                    char:PivotTo(hrp.CFrame * CFrame.new(0, deltaY, 0))
+                else
+                    baseY = nil
+                end
+            end
+        end)
+    end
+end
+
+ChaterTab:Toggle({
+    Title = "Snap Under Map",
+    Default = false,
+    Callback = function(state)
+        SetSnapState(state)
+    end
+})
+
+ChaterTab:Keybind({
+    Title = "Snap Keybind",
+    Flag = "snap_keybind",
+    Value = "G",
+    Callback = function()
+        SetSnapState(not EnabledSnapRunning)
+    end
+})
+
+ChaterTab:Slider({
+    Title = "Snap Depth",
+    Flag = "snap_height",
+    Step = 1,
+    Value = { Min = 1, Max = 50, Default = YoffsetValue },
+    Callback = function(value)
+        YoffsetValue = value
+    end
+})
 
 
 
