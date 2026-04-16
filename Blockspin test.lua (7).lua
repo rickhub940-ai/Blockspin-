@@ -745,93 +745,171 @@ end)
 
 
 
--- farm 7-11
+-- farm 7-11 + Auto Deposit
 
-
--- Auto Seven Eleven Quest (สมบูรณ์ รองรับการเกิดใหม่เมื่อตาย)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VIM = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
+
+local ATMModule = require(ReplicatedStorage.Modules.Game.ATM.ATM)
+local Net = require(ReplicatedStorage.Modules.Core.Net)
 
 local Client = Players.LocalPlayer
-local Character = Client.Character or Client.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-local RootPart = Character:WaitForChild("HumanoidRootPart")
-local Backpack = Client:WaitForChild("Backpack")
-
-local fireproximityprompt = fireproximityprompt or getfenv().fireproximityprompt
-
--- ========== ตัวแปร ==========
-local StopWalking = false
-local isRunning = false
-local currentTargetPosition = nil
-local checkDistanceTask = nil
-
--- ค่าเริ่มต้น: ปิด
+_G.StopWalking = false
+_G.AutoATM = false
 _G.AutoSevenEleven = false
 
--- ========== ฟังก์ชันระยะทาง ==========
-local function dist(pos)
-    return (pos - RootPart.Position).Magnitude
+
+if not _G.Bypass then
+    local func = getupvalue(Net.get, 2)
+    if func then
+        setconstant(func, 3, "KUYIENGOKUYIENGO")
+        setconstant(func, 4, "KUYIENGOKUYIENGO")
+    end
+    _G.Bypass = true
 end
 
--- ========== ลบ DoorSystem และ VehicleBlockers ==========
+
+local DepositAmount = 200
+
+local function GetMoney()
+    local gui = Client:FindFirstChild("PlayerGui")
+    if not gui then return 0 end
+    local hud = gui:FindFirstChild("TopRightHud", true)
+    if not hud then return 0 end
+    local label = hud:FindFirstChild("MoneyTextLabel", true)
+    if not label or not label.Text then return 0 end
+    local text = label.Text:gsub("[$,]", "")
+    local num = text:match("%d+")
+    return tonumber(num) or 0
+end
+
+local function IsATMAvailable(atm)
+    return atm and atm.states and atm.states.hacker.get() == nil and atm.states.disabled.get() == false
+end
+
+local function GetNearestATM()
+    local char = Client.Character
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    local nearest, dist = nil, math.huge
+    for _, atm in pairs(ATMModule.class.objects) do
+        if IsATMAvailable(atm) then
+            local root = atm.instance:FindFirstChildWhichIsA("BasePart")
+            if root then
+                local d = (hrp.Position - root.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    nearest = atm
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function computePath(startPos, endPos)
+    local path = PathfindingService:CreatePath({
+        AgentCanJump = true,
+        AgentJumpHeight = 6,
+        AgentHeight = 5,
+        AgentRadius = 2,
+        WaypointSpacing = 3
+    })
+    local function try(goal)
+        local ok = pcall(function()
+            path:ComputeAsync(startPos, goal)
+        end)
+        return ok and path.Status == Enum.PathStatus.Success
+    end
+    if try(endPos) then return path end
+    for i = 1, 3 do
+        local offset = Vector3.new(math.random(-6,6), 0, math.random(-6,6))
+        if try(endPos + offset) then
+            return path
+        end
+    end
+    return nil
+end
+
+local function walkToATM(atm)
+    local character = Client.Character or Client.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+    local root = atm.instance:FindFirstChildWhichIsA("BasePart")
+    if not root then return false end
+    local path = computePath(rootPart.Position, root.Position)
+    if not path then return false end
+    for _, wp in ipairs(path:GetWaypoints()) do
+        if humanoid.Health <= 0 then return false end
+        if not IsATMAvailable(atm) then return false end
+        humanoid:MoveTo(wp.Position)
+        if wp.Action == Enum.PathWaypointAction.Jump then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+        local reached = false
+        local conn = humanoid.MoveToFinished:Connect(function()
+            reached = true
+            if conn then conn:Disconnect() end
+        end)
+        local start = tick()
+        repeat
+            task.wait()
+            if _G.StopWalking or not _G.AutoATM then
+                if conn then conn:Disconnect() end
+                return false
+            end
+            if tick() - start > 3 then
+                if conn then conn:Disconnect() end
+                return false
+            end
+        until reached
+    end
+    return true
+end
+
+local function IsNearATM(atm)
+    local char = Client.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local root = atm.instance:FindFirstChildWhichIsA("BasePart")
+    if not hrp or not root then return false end
+    return (hrp.Position - root.Position).Magnitude <= 6
+end
+
+local function DepositMoney(amount)
+    Net.get("transfer_funds", "hand", "bank", amount)
+end
+
+-- ========== SEVEN ELEVEN SYSTEM ==========
 local function removeBlockers()
     for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "DoorSystem" then 
-            v:Destroy()
-        end
-        if v.Name == "VehicleBlockers" then 
+        if v.Name == "DoorSystem" or v.Name == "VehicleBlockers" then 
             v:Destroy()
         end
     end
 end
 
-removeBlockers()
-workspace.DescendantAdded:Connect(function(descendant)
-    task.wait(0.5)
-    if descendant.Name == "DoorSystem" or descendant.Name == "VehicleBlockers" then
-        removeBlockers()
-    end
-end)
-
--- ========== อัปเดตตัวละครใหม่เมื่อเกิดใหม่ ==========
 local function updateCharacter()
-    Character = Client.Character or Client.CharacterAdded:Wait()
-    Humanoid = Character:WaitForChild("Humanoid")
-    RootPart = Character:WaitForChild("HumanoidRootPart")
-    Backpack = Client:WaitForChild("Backpack")
-    print("🔄 อัปเดตตัวละครใหม่ (เกิดใหม่แล้ว)")
+    local Character = Client.Character or Client.CharacterAdded:Wait()
+    local Humanoid = Character:WaitForChild("Humanoid")
+    local RootPart = Character:WaitForChild("HumanoidRootPart")
+    local Backpack = Client:WaitForChild("Backpack")
+    return Character, Humanoid, RootPart, Backpack
 end
 
--- ตรวจจับการตายและรอเกิดใหม่
-Client.CharacterAdded:Connect(function(newChar)
-    print("💀 ตัวละครตาย! กำลังรอเกิดใหม่...")
-    task.wait(2)
-    Character = newChar
-    Humanoid = Character:WaitForChild("Humanoid")
-    RootPart = Character:WaitForChild("HumanoidRootPart")
-    Backpack = Client:WaitForChild("Backpack")
-    StopWalking = false
-    currentTargetPosition = nil
-    print("✅ เกิดใหม่แล้ว พร้อมทำงานต่อ")
-end)
-
--- ========== ฟังก์ชันกดรับงานผ่าน UI ==========
 local function autoApplyJob()
     if Client:GetAttribute("Job") == "shelf_stocker" then 
         return true 
     end
-    
     local jobGui = Client.PlayerGui:FindFirstChild("JobApplication")
     if jobGui and jobGui.Enabled then
         local frame = jobGui:FindFirstChild("JobApplicationFrame") or jobGui:FindFirstChild("Frame")
         local btn = frame and (frame:FindFirstChild("ApplyJob") or frame:FindFirstChild("Apply"))
-        
         if frame and frame.Visible and btn and btn.Visible then
             pcall(function()
                 btn.Selectable = true
@@ -848,13 +926,9 @@ local function autoApplyJob()
     return false
 end
 
--- ========== ฟังก์ชันเดิน ==========
-local function walkTo(destination, value)
-    if not value then return end
-    if not destination then return end
-    if not RootPart then updateCharacter() end
-    
-    currentTargetPosition = destination
+local function walkToSeven(destination, char, humanoid, rootPart)
+    if not destination or not rootPart then return false end
+    if _G.StopWalking then return false end
     
     local path = PathfindingService:CreatePath({
         AgentCanJump = true,
@@ -864,91 +938,43 @@ local function walkTo(destination, value)
     })
     
     local success = pcall(function()
-        path:ComputeAsync(RootPart.Position, destination)
+        path:ComputeAsync(rootPart.Position, destination)
     end)
     
     if success and path.Status == Enum.PathStatus.Success then
         for _, wp in ipairs(path:GetWaypoints()) do
-            if StopWalking or not _G.AutoSevenEleven then return end
-            if Humanoid and Humanoid.Health <= 0 then break end
+            if _G.StopWalking or not _G.AutoSevenEleven then return false end
+            if humanoid and humanoid.Health <= 0 then break end
             
             local finished = false
-            local conn
-            conn = Humanoid.MoveToFinished:Connect(function()
+            local conn = humanoid.MoveToFinished:Connect(function()
                 finished = true
                 if conn then conn:Disconnect() end
             end)
             
-            Humanoid:MoveTo(wp.Position)
-            
+            humanoid:MoveTo(wp.Position)
             if wp.Action == Enum.PathWaypointAction.Jump then
-                Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
             end
             
-            repeat task.wait() until finished or StopWalking or not _G.AutoSevenEleven
-            if StopWalking or not _G.AutoSevenEleven then return end
+            repeat task.wait() until finished or _G.StopWalking or not _G.AutoSevenEleven
+            if _G.StopWalking or not _G.AutoSevenEleven then return false end
         end
     end
+    return true
 end
 
--- ========== ตรวจสอบและเดินกลับเมื่อกระเด็น ==========
-local function startPositionCheck(targetPos)
-    if checkDistanceTask then
-        task.cancel(checkDistanceTask)
-    end
+local function AutoSevenElevenQuest()
+    if _G.StopWalking then return end
     
-    checkDistanceTask = task.spawn(function()
-        while _G.AutoSevenEleven and targetPos do
-            task.wait(0.5)
-            if RootPart and targetPos and dist(targetPos) > 4 and not StopWalking then
-                print("⚠️ กระเด็นออกจากตำแหน่ง กำลังเดินกลับ...")
-                walkTo(targetPos, true)
-            end
-        end
-    end)
-end
-
-local function stopPositionCheck()
-    if checkDistanceTask then
-        task.cancel(checkDistanceTask)
-        checkDistanceTask = nil
-    end
-end
-
--- ========== ฟังก์ชันหยุดเดิน ==========
-local function StopWalkingFunc()
-    StopWalking = true
-    if Humanoid then
-        Humanoid:MoveTo(RootPart.Position)
-    end
-    task.wait(0.1)
-    StopWalking = false
-end
-
--- ========== ระบบ Auto Seven Eleven Quest ==========
-local function AutoSevenElevenQuest(Value)
-    if not Value then 
-        StopWalkingFunc()
-        stopPositionCheck()
-        return 
-    end
-    
-    -- อัปเดตตัวละครทุกครั้งก่อนทำงาน
-    if not RootPart or not Humanoid or Humanoid.Health <= 0 then
-        updateCharacter()
-        task.wait(1)
-    end
-    
-    if not RootPart or not Humanoid then return end
+    local Character, Humanoid, RootPart, Backpack = updateCharacter()
+    if not RootPart or not Humanoid or Humanoid.Health <= 0 then return end
     
     if Client:GetAttribute("Job") == "shelf_stocker" then
         if not Backpack:FindFirstChild("BoxTool") and not Character:FindFirstChild("BoxTool") then
-            -- ไปรับ BoxTool
             local boxPos = Vector3.new(143, 255, 207)
-            currentTargetPosition = boxPos
-            startPositionCheck(boxPos)
-            
-            if dist(boxPos) < 5 then
+            walkToSeven(boxPos, Character, Humanoid, RootPart)
+            if (RootPart.Position - boxPos).Magnitude < 5 then
                 local boxPrompt = workspace:FindFirstChild("Map")
                     and workspace.Map:FindFirstChild("Tiles")
                     and workspace.Map.Tiles:FindFirstChild("GasStationTile")
@@ -957,77 +983,86 @@ local function AutoSevenElevenQuest(Value)
                     and workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("ShelfStockingJob")
                     and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob:FindFirstChild("NormalBox")
                     and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob.NormalBox:FindFirstChild("ProximityPrompt")
-                
                 if boxPrompt then
+                    local fireproximityprompt = fireproximityprompt or getfenv().fireproximityprompt
                     fireproximityprompt(boxPrompt, 3)
                 end
             end
-            walkTo(boxPos, Value)
-        else
-            if Character:FindFirstChild("BoxTool") then
-                -- มี BoxTool แล้ว ไปจัดชั้นวาง
-                local shelves = workspace:FindFirstChild("Map")
-                    and workspace.Map:FindFirstChild("Tiles")
-                    and workspace.Map.Tiles:FindFirstChild("GasStationTile")
-                    and workspace.Map.Tiles.GasStationTile:FindFirstChild("Quick11")
-                    and workspace.Map.Tiles.GasStationTile.Quick11:FindFirstChild("Interior")
-                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("ShelfStockingJob")
-                    and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob:FindFirstChild("Shelves")
-                
-                if shelves then
-                    for _, shelf in ipairs(shelves:GetChildren()) do
-                        if not _G.AutoSevenEleven then break end
-                        if shelf:FindFirstChild("Attachment") then
-                            currentTargetPosition = shelf.Position
-                            startPositionCheck(shelf.Position)
-                            walkTo(shelf.Position, Value)
-                            task.wait(1)
-                        end
+        elseif Character:FindFirstChild("BoxTool") then
+            local shelves = workspace:FindFirstChild("Map")
+                and workspace.Map:FindFirstChild("Tiles")
+                and workspace.Map.Tiles:FindFirstChild("GasStationTile")
+                and workspace.Map.Tiles.GasStationTile:FindFirstChild("Quick11")
+                and workspace.Map.Tiles.GasStationTile.Quick11:FindFirstChild("Interior")
+                and workspace.Map.Tiles.GasStationTile.Quick11.Interior:FindFirstChild("ShelfStockingJob")
+                and workspace.Map.Tiles.GasStationTile.Quick11.Interior.ShelfStockingJob:FindFirstChild("Shelves")
+            if shelves then
+                for _, shelf in ipairs(shelves:GetChildren()) do
+                    if not _G.AutoSevenEleven or _G.StopWalking then break end
+                    if shelf:FindFirstChild("Attachment") then
+                        walkToSeven(shelf.Position, Character, Humanoid, RootPart)
+                        task.wait(1)
                     end
                 end
-            else
-                local tool = Backpack:FindFirstChild("BoxTool")
-                if tool then
-                    Humanoid:EquipTool(tool)
-                end
             end
+        else
+            local tool = Backpack:FindFirstChild("BoxTool")
+            if tool then Humanoid:EquipTool(tool) end
         end
     else
-        -- ไปรับงาน
         local jobPos = Vector3.new(166.34539794921875, 255.19053649902344, 203.02333068847656)
-        currentTargetPosition = jobPos
-        startPositionCheck(jobPos)
-        
-        walkTo(jobPos, Value)
+        walkToSeven(jobPos, Character, Humanoid, RootPart)
         task.wait(0.5)
-        
         autoApplyJob()
     end
 end
 
--- ========== ฟังก์ชันควบคุม ==========
-local function start()
-    if isRunning then return end
-    isRunning = true
-    _G.AutoSevenEleven = true
-    updateCharacter() -- อัปเดตตัวละครก่อนเริ่ม
-    task.spawn(function()
-        while _G.AutoSevenEleven do
-            AutoSevenElevenQuest(true)
-            task.wait(0.1)
+-- ========== MAIN LOOP ==========
+task.spawn(function()
+    removeBlockers()
+    workspace.DescendantAdded:Connect(function(descendant)
+        task.wait(0.5)
+        if descendant.Name == "DoorSystem" or descendant.Name == "VehicleBlockers" then
+            removeBlockers()
         end
     end)
-    print("✅ Auto Seven Eleven")
-end
+    
+    while task.wait(1) do
+        if _G.AutoATM and not _G.AutoSevenEleven then
+            if not _G.StopWalking then
+                local money = GetMoney()
+                if money >= DepositAmount then
+                    _G.StopWalking = true
+                    local atm = GetNearestATM()
+                    if atm then
+                        local success = walkToATM(atm)
+                        if success and IsNearATM(atm) then
+                            DepositMoney(DepositAmount)
+                            task.wait(2)
+                        end
+                    end
+                    _G.StopWalking = false
+                end
+            end
+        end
+    end
+end)
 
-local function stop()
-    _G.AutoSevenEleven = false
-    stopPositionCheck()
-    StopWalkingFunc()
-    isRunning = false
-    currentTargetPosition = nil
-    print("❌ Auto Seven Eleven")
-end
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G.AutoSevenEleven and not _G.AutoATM then
+            if not _G.StopWalking then
+                AutoSevenElevenQuest()
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+
+
+
+        
 
 
 
@@ -1417,19 +1452,16 @@ ChaterTab:Toggle({
 })
 
 
--- Services ที่จำเป็น
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- โมดูลที่ต้องใช้
+
 local RagdollModule = require(ReplicatedStorage.Modules.Core.Ragdoll)
 local Net = require(ReplicatedStorage.Modules.Core.Net)
-
--- ตัวแปรสำหรับ Anti Ragdoll
 local player = Players.LocalPlayer
 
--- อันติแรคดอล
 local function AntiRagdollLoop()
     while _G.AntiRagdoll do
         task.wait(0.1)
@@ -1471,13 +1503,50 @@ FarmTab:Divider()
 
 FarmTab:Toggle({
     Title = "Auto Seven Eleven",
-    Desc = "ทำงานเซเว่นอัตโนมัติ",
-    Default = false,
+    Desc = "ทำงาน เซเว่น อัตโนมัติ",
+    Icon = "bird",
+    Type = "Checkbox",
+    Value = false,
     Callback = function(state)
+        _G.AutoSevenEleven = state
         if state then
-            start()
-        else
-            stop()
+            _G.AutoATM = false
+        end
+        if not state then
+            _G.StopWalking = false
+        end
+    end
+})
+
+
+FarmTab:Toggle({
+    Title = "Auto Deposit",
+    Desc = "ฝากเงินอัตโนมัติเมื่อเงินถึงจำนวนที่กำหนด",
+    Icon = "bird",
+    Type = "Checkbox",
+    Value = false,
+    Callback = function(state)
+        _G.AutoATM = state
+        if state then
+            _G.AutoSevenEleven = false
+        end
+        if not state then
+            _G.StopWalking = false
+        end
+    end
+})
+
+FarmTab:Input({
+    Title = "DepositAmount",
+    Desc = "จำนวนเงินที่จะฝากแต่ละครั้ง",
+    Value = "200",
+    InputIcon = "bird",
+    Type = "Input",
+    Placeholder = "ใส่จำนวนเงิน",
+    Callback = function(input)
+        local num = tonumber(input)
+        if num and num > 0 then
+            DepositAmount = num
         end
     end
 })
