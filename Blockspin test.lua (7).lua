@@ -389,9 +389,137 @@ end)
 
 
 
--- Esp
+-- Esp เลือก
 
 
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local ESPHealthEnabled = false
+
+
+local function removeESP()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character and plr.Character:FindFirstChild("Head") then
+            local esp = plr.Character.Head:FindFirstChild("HealthESP")
+            if esp then
+                esp:Destroy()
+            end
+        end
+    end
+end
+
+local function createESP(character)
+    if not ESPHealthEnabled then return end
+
+    local head = character:FindFirstChild("Head")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not head or not humanoid then return end
+
+    if head:FindFirstChild("HealthESP") then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "HealthESP"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(8, 0, 0.9, 0)
+    billboard.StudsOffset = Vector3.new(0, 3.8, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 10000
+    billboard.Parent = head
+
+    local bg = Instance.new("Frame", billboard)
+    bg.Size = UDim2.new(1,0,1,0)
+    bg.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    bg.BorderSizePixel = 0
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(1,0)
+
+    local stroke = Instance.new("UIStroke", bg)
+    stroke.Thickness = 2
+    stroke.Color = Color3.new(0,0,0)
+
+    local bar = Instance.new("Frame", bg)
+    bar.Size = UDim2.new(1,0,1,0)
+    bar.BorderSizePixel = 0
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+
+    local text = Instance.new("TextLabel", bg)
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextScaled = true
+    text.Font = Enum.Font.GothamBold
+    text.TextColor3 = Color3.new(1,1,1)
+    text.TextStrokeTransparency = 0
+
+    local function update()
+        if not ESPHealthEnabled then return end
+
+        local hpPercent = humanoid.Health / humanoid.MaxHealth
+
+        TweenService:Create(bar, TweenInfo.new(0.15), {
+            Size = UDim2.new(hpPercent,0,1,0)
+        }):Play()
+
+        local color
+        if hpPercent > 0.5 then
+            color = Color3.fromRGB(0,255,0)
+        elseif hpPercent > 0.25 then
+            color = Color3.fromRGB(255,170,0)
+        else
+            color = Color3.fromRGB(255,0,0)
+        end
+
+        bar.BackgroundColor3 = color
+        text.Text = math.floor(humanoid.Health)
+    end
+
+    humanoid.HealthChanged:Connect(update)
+    update()
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not ESPHealthEnabled then
+            if billboard then billboard:Destroy() end
+            if conn then conn:Disconnect() end
+            return
+        end
+
+        if not character or not character.Parent then
+            conn:Disconnect()
+            return
+        end
+
+        local dist = (Camera.CFrame.Position - head.Position).Magnitude
+        local scale = math.clamp(30 / dist, 1.2, 4)
+
+        billboard.Size = UDim2.new(8 * scale, 0, 0.9 * scale, 0)
+    end)
+
+    humanoid.Died:Connect(function()
+        if conn then conn:Disconnect() end
+        billboard:Destroy()
+    end)
+end
+local function setupPlayer(player)
+    if player == LocalPlayer then return end
+
+    player.CharacterAdded:Connect(function(char)
+        task.wait(1)
+        if ESPHealthEnabled then
+            createESP(char)
+        end
+    end)
+
+    if player.Character and ESPHealthEnabled then
+        createESP(player.Character)
+    end
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
 
 
 
@@ -1166,6 +1294,22 @@ CombatTab:Dropdown({
 
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
+
+EspTab:Toggle({
+    Title = "ESPHealthEnabled",
+    Desc = "แสดงเลือด",
+    Default = false,
+    Callback = function(state)
+        ESPHealthEnabled = state
+        if state then
+            for _, plr in ipairs(Players:GetPlayers()) do
+                setupPlayer(plr)
+            end
+        else
+            removeESP()
+        end
+    end
+})
 
 
 local ItemsESPToggle = EspTab:Toggle({
