@@ -1135,67 +1135,6 @@ end)
 
 -- Anti kill
 
-local flickering = false
-local undergroundBaseCFrame = nil
-local AntiKillEnabled = false  
-
-local function isDowned()
-    local hum = CharModule.get_hum()
-    return hum and (hum:GetAttribute("HasBeenDowned") or hum:GetAttribute("IsDead") or hum.Health <= 0)
-end
-
-local function getHRP()
-    local char = CharModule.current_char.get()
-    if not char then return end
-    return char:FindFirstChild("HumanoidRootPart")
-end
-
-local function teleportUnderground()
-    local hrp = getHRP()
-    if not hrp then return end
-    local original = hrp.CFrame
-    undergroundBaseCFrame = original + Vector3.new(0, -55, 0)
-    hrp.CFrame = undergroundBaseCFrame
-end
-
-local function flickerAndMove()
-    if flickering then return end
-    flickering = true
-    task.spawn(function()
-        while flickering and AntiKillEnabled and isDowned() do 
-            local hrp = getHRP()
-            if hrp and undergroundBaseCFrame then
-                local angle = math.random() * math.pi * 2
-                local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * 10
-                local randomPos = undergroundBaseCFrame.Position + offset
-                hrp.CFrame = CFrame.new(randomPos)
-                task.wait(0.05)
-                hrp.CFrame = undergroundBaseCFrame
-            end
-            task.wait(0.1)
-        end
-        flickering = false
-    end)
-end
-RunService.Heartbeat:Connect(function()
-    if not AntiKillEnabled then return end 
-    if isDowned() then
-        local hrp = getHRP()
-        if hrp and not undergroundBaseCFrame then
-            teleportUnderground()
-        end
-        flickerAndMove()
-    else
-        if undergroundBaseCFrame then
-            local hrp = getHRP()
-            if hrp then
-                hrp.CFrame = undergroundBaseCFrame + Vector3.new(0, 55, 0)
-            end
-        end
-        undergroundBaseCFrame = nil
-        flickering = false
-    end
-end)
 
 
         
@@ -1572,18 +1511,23 @@ ChaterTab:Toggle({
     end
 })
 
+local plsraknet = Raknet or raknet
+if not plsraknet then return end
 
-
-
-
-local AntiKillToggle = ChaterTab:Toggle({
-    Title = "Anti Kill",
-    Desc = "(Noob)",
+ChaterTab:Toggle({
+    Title = "Desync is op ",
+    Desc = "",
     Default = false,
     Callback = function(state)
-        AntiKillEnabled = state 
+        if plsraknet and plsraknet.desync then
+            plsraknet.desync(state)
+        end
     end
 })
+
+
+
+
 
 
 local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
