@@ -165,7 +165,7 @@ img.BackgroundTransparency = 1
 img.ScaleType = Enum.ScaleType.Fit
 img.AnchorPoint = Vector2.new(0.5, 0.5)
 img.Position = UDim2.new(0.5, 0, 0.5, 0)
-img.Image = "rbxassetid://112591934047768"
+img.Image = "rbxassetid://131244894073789"
 img.Parent = billboard
 
 local currentTarget = nil
