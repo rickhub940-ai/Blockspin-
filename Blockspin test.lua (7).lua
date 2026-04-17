@@ -1137,7 +1137,114 @@ end)
 
 
 
-        
+-- Esp items drop
+
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local folder = workspace:WaitForChild("DroppedItems")
+
+local rarity_itemsdrop = {
+	Common = Color3.fromRGB(200,200,200),
+	Uncommon = Color3.fromRGB(86,176,62),
+	Rare = Color3.fromRGB(0,162,255),
+	Epic = Color3.fromRGB(170,85,255),
+	Legendary = Color3.fromRGB(255,170,0),
+	Omega = Color3.fromRGB(255,75,255)
+}
+
+local ItemRarityDB = {}
+local DropVisualCache = {}
+
+local function registerItems()
+	local itemsFolder = ReplicatedStorage:WaitForChild("Items")
+
+	for _, cat in ipairs({"gun","melee","throwable","consumable","farming","misc","rod","fish"}) do
+		local folderCat = itemsFolder:FindFirstChild(cat)
+		if folderCat then
+			for _, item in ipairs(folderCat:GetChildren()) do
+				ItemRarityDB[item.Name] = item:GetAttribute("RarityName") or "Common"
+			end
+		end
+	end
+end
+
+registerItems()
+
+local function getRarity(name)
+	return ItemRarityDB[name] or "Common"
+end
+
+local function getColor(name, rarity)
+	if name == "Monney" then
+		return Color3.fromRGB(0,255,0)
+	end
+	return rarity_itemsdrop[rarity] or Color3.new(1,1,1)
+end
+
+local function createVisual(item)
+	if DropVisualCache[item] then return end
+
+	local part = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
+	if not part then return end
+
+	local rarity = getRarity(item.Name)
+	local color = getColor(item.Name, rarity)
+
+	local h = Instance.new("Highlight")
+	h.Adornee = item
+	h.FillTransparency = 0.75
+	h.OutlineTransparency = 0
+	h.FillColor = color
+	h.OutlineColor = color
+	h.Parent = item
+
+	local bb = Instance.new("BillboardGui")
+	bb.Adornee = part
+	bb.Size = UDim2.new(0,130,0,40)
+	bb.StudsOffset = Vector3.new(0,2,0)
+	bb.AlwaysOnTop = true
+	bb.Parent = item
+
+	local amount = item:GetAttribute("Amount") or 1
+
+	local text = Instance.new("TextLabel")
+	text.BackgroundTransparency = 1
+	text.Size = UDim2.new(1,0,1,0)
+	text.TextScaled = true
+	text.Font = Enum.Font.SourceSansBold
+	text.TextColor3 = color
+	text.Text = item.Name .. " [" .. rarity .. "] x" .. amount
+	text.Parent = bb
+
+	DropVisualCache[item] = {
+		Highlight = h,
+		Billboard = bb
+	}
+end
+
+local function removeVisual(item)
+	if DropVisualCache[item] then
+		for _, obj in pairs(DropVisualCache[item]) do
+			obj:Destroy()
+		end
+		DropVisualCache[item] = nil
+	end
+end
+
+local ESPItemDropEnabled = false
+
+RunService.RenderStepped:Connect(function()
+	if not ESPItemDropEnabled then return end
+
+	for _, item in ipairs(folder:GetChildren()) do
+		createVisual(item)
+	end
+end)
+
+folder.ChildRemoved:Connect(removeVisual)
+
+
 
 
 
@@ -1359,7 +1466,14 @@ EspTab:Toggle({
         end
     end
 })
-
+EspTab:Toggle({
+	Title = "ESP items drop",
+	Desc = "แสดงของที่ตกพื้น",
+	Default = false,
+	Callback = function(state)
+		ESPItemDropEnabled = state
+	end
+})
 
 local ItemsESPToggle = EspTab:Toggle({
     Title = "Items Invectorry ESP",
@@ -1430,7 +1544,6 @@ ChaterTab:Toggle({
             local NetModule = require(ReplicatedStorage.Modules.Core.Net)
             local SprintModule = require(ReplicatedStorage.Modules.Game.Sprint)
 
-            -- เธเธฑเธเธเนเธณ
             if staminaConnection then staminaConnection:Disconnect() end
 
             staminaConnection = RunService.Heartbeat:Connect(function()
@@ -1443,7 +1556,7 @@ ChaterTab:Toggle({
 
             SprintBar.update = function(...)
                 if getgenv().InfiniteStamina then
-                    return 1 -- เน€เธ•เนเธกเธ•เธฅเธญเธ”
+                    return 1 
                 end
                 return oldUpdate(...)
             end
