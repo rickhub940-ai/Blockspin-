@@ -1389,6 +1389,57 @@ end)
 
 
 
+-- Anti Aim
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Client = Players.LocalPlayer
+local Char = require(game.ReplicatedStorage.Modules.Core.Char)
+
+getgenv().AntiAim = false
+
+RunService.Heartbeat:Connect(function()
+    if getgenv().AntiAim then   
+        local HumanoidModule = Char.get_hum()
+        if HumanoidModule and not HumanoidModule:GetAttribute("HasBeenDowned") then 
+            local RootPartModule = Char.get_hrp()
+            if not RootPartModule then return end
+
+            local A = RootPartModule.Velocity
+            local B = RootPartModule.AssemblyLinearVelocity
+            local C = RootPartModule.AssemblyAngularVelocity
+
+            RootPartModule.Velocity = Vector3.new(
+                math.random(-100000,999999),
+                math.random(-100000,999999),
+                math.random(-100000,999999)
+            )
+
+            RootPartModule.AssemblyLinearVelocity = Vector3.new(
+                math.random(-100000,999999),
+                math.random(-100000,999999),
+                math.random(-100000,999999)
+            )
+
+            RootPartModule.AssemblyAngularVelocity = Vector3.new(
+                math.random(-100000,999999),
+                math.random(-100000,999999),
+                math.random(-100000,999999)
+            )
+
+            RunService.RenderStepped:Wait()
+
+            RootPartModule.Velocity = A
+            RootPartModule.AssemblyLinearVelocity = B
+            RootPartModule.AssemblyAngularVelocity = C
+        end
+    end
+end)
+
+
+
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
@@ -1587,6 +1638,15 @@ ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(sta
         end)
     end
 end})
+
+ChaterTab:Toggle({
+    Title = "Anti Aim",
+    Flag = "antiaim",
+    Value = false,
+    Callback = function(v)
+        getgenv().AntiAim = v
+    end
+})
 ChaterTab:Slider({Title = "valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
 
 
