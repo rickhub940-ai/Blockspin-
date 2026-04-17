@@ -1639,6 +1639,31 @@ ChaterTab:Toggle({
 })
 
 
+local RagdollModule = require(game.ReplicatedStorage.Modules.Game.Ragdoll)
+local Network = require(game.ReplicatedStorage.Modules.Core.Net)
+
+local OldGet = RagdollModule.is_ragdolling.get
+
+RagdollModule.is_ragdolling.get = function(...)
+    local result = OldGet(...)
+    if result == true and _G.AntiRagdoll then
+        RagdollModule.is_ragdolling.set(false)
+        Network.send("end_ragdoll_early")
+        Network.send("clear_ragdoll")
+    end
+    return result
+end
+
+ChaterTab:Toggle({
+    Title = "Anti Ragdoll",
+	Desc = "กันกระเดน",
+    Flag = "AntiRagdoll",
+    Value = false,
+    Callback = function(Value)
+        _G.AntiRagdoll = Value
+    end
+})
+
 
 -- มุดดิน
 
