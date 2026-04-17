@@ -118,67 +118,62 @@ end)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Network = require(ReplicatedStorage.Modules.Core.Net)
+
+local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
 local TargetHistory = {}
 
+-- ตัวแปรควบคุมจาก UI
 local SilentAimEnabled = false
 local ShowFOV = false
 local ShowTracer = false
 local FOV = 200
-local HIGH_VEL_THRESHOLD = 250
-local HitPart = "Head"
+local HitPart = "Head"  -- "Head" หรือ "Body"
 local SavedFriends = {}
 
+local HIGH_VEL_THRESHOLD = 250
+
+-- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
 fovCircle.Filled = false
-fovCircle.Color = Color3.fromRGB(255,255,255)
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
 fovCircle.Visible = false
 
+-- Tracer 2D (เส้นบนหน้าจอ)
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
-tracer.Color = Color3.fromRGB(255,0,0)
+tracer.Color = Color3.fromRGB(255, 0, 0)
 tracer.Visible = false
 
-local TargetDot = Drawing.new("Circle")
-TargetDot.Color = Color3.fromRGB(255,0,0)
-TargetDot.Radius = 4
-TargetDot.Filled = true
-TargetDot.Visible = false
+-- Billboard หมุนได้
+local billboard = Instance.new("BillboardGui")
+billboard.Size = UDim2.new(0, 35, 0, 35)
+billboard.AlwaysOnTop = true
+billboard.MaxDistance = math.huge
+billboard.StudsOffset = Vector3.new(0, 0, 0)
+billboard.Enabled = false
+billboard.Parent = game.CoreGui
 
-local shotToggle = false
+local img = Instance.new("ImageLabel")
+img.Size = UDim2.new(1, 0, 1, 0)
+img.BackgroundTransparency = 1
+img.ScaleType = Enum.ScaleType.Fit
+img.AnchorPoint = Vector2.new(0.5, 0.5)
+img.Position = UDim2.new(0.5, 0, 0.5, 0)
+img.Image = "rbxassetid://112591934047768"
+img.Parent = billboard
 
-local function CreateTracer(fromPos, toPos)
-    if not SilentAimEnabled then return end
-    shotToggle = not shotToggle
-    local distance = (toPos - fromPos).Magnitude
+local currentTarget = nil
+local rotation = 0
 
-    local part = Instance.new("Part")  
-    part.Size = Vector3.new(0.25, 0.25, distance)  
-    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)  
-    part.Anchored = true  
-    part.CanCollide = false  
-    part.Material = Enum.Material.Neon  
-    part.Color = shotToggle and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)  
-    part.Parent = workspace  
-
-    Debris:AddItem(part, 3)
-end
-
-local function GetDistanceStart(a, b)
-    return (a - b).Magnitude
-end
-
+-- ฟังก์ชันช่วย
 local function WorldToViewPoint(pos)
-    local vp, onScreen = Camera:WorldToViewportPoint(pos)
-    return vp, onScreen
+    return Camera:WorldToViewportPoint(pos)
 end
 
 local function IsAlive(model)
@@ -193,196 +188,210 @@ local function IsBehindWall(startPos, endPos, ignore)
     return hit ~= nil
 end
 
-local function getPart(char)
+local function IsFriend(player)
+    return SavedFriends[player.Name] == true
+end
+
+local function GetTargetPart(character)
     if HitPart == "Head" then
-        return char:FindFirstChild("Head")
-    else
-        return char:FindFirstChild("HumanoidRootPart")
+        return character:FindFirstChild("Head")
+    else  -- Body
+        return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
     end
 end
 
 local function GetClosestTarget()
+    if not SilentAimEnabled then return nil end
+    
     local closest = nil
     local dist = math.huge
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
-    for _, v in pairs(Players:GetPlayers()) do  
-        if v ~= LocalPlayer and not SavedFriends[v.Name] and v.Character and IsAlive(v.Character) then  
-            local targetPart = getPart(v.Character)  
-            if targetPart then  
-                local pos, onScreen = WorldToViewPoint(targetPart.Position)  
-                if onScreen then  
-                    local d = GetDistanceStart(  
-                        Vector2.new(pos.X, pos.Y),  
-                        Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
-                    )  
-                    if d < FOV and d < dist then  
-                        closest = v.Character  
-                        dist = d  
-                    end  
-                end  
-            end  
-        end  
-    end  
-
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and not IsFriend(v) and v.Character and IsAlive(v.Character) then
+            local targetPart = GetTargetPart(v.Character)
+            if targetPart then
+                local pos, onScreen = WorldToViewPoint(targetPart.Position)
+                if onScreen then
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < FOV and d < dist then
+                        closest = v.Character
+                        dist = d
+                    end
+                end
+            end
+        end
+    end
     return closest
 end
 
-RunService.RenderStepped:Connect(function()
-    if not SilentAimEnabled then
-        fovCircle.Visible = false
-        tracer.Visible = false
-        TargetDot.Visible = false
-        return
-    end
+-- สร้าง Tracer 3D (ตอนยิง)
+local shotToggle = false
+local function CreateTracer(fromPos, toPos)
+    shotToggle = not shotToggle
+    local distance = (toPos - fromPos).Magnitude
 
-    -- อัปเดตรัศมี FOV ให้ตรงกับค่าปัจจุบัน
-    if fovCircle.Radius ~= FOV then
-        fovCircle.Radius = FOV
-    end
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(0.25, 0.25, distance)
+    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance / 2)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = shotToggle and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 0, 0)
+    part.Parent = workspace
 
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
-    fovCircle.Visible = ShowFOV  
+    Debris:AddItem(part, 3)
+end
 
-    if ShowTracer then  
-        local target = GetClosestTarget()  
-        if target then  
-            local targetPart = getPart(target)  
-            if targetPart then  
-                local pos, onScreen = WorldToViewPoint(targetPart.Position)  
-                if onScreen then  
-                    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)  
-                    local screenPos = Vector2.new(pos.X, pos.Y)  
-                      
-                    tracer.From = center  
-                    tracer.To = screenPos  
-                    tracer.Visible = true  
-                      
-                    TargetDot.Position = screenPos  
-                    TargetDot.Visible = true  
-                else  
-                    tracer.Visible = false  
-                    TargetDot.Visible = false  
-                end  
-            else  
-                tracer.Visible = false  
-                TargetDot.Visible = false  
-            end  
-        else  
-            tracer.Visible = false  
-            TargetDot.Visible = false  
-        end  
-    else  
-        tracer.Visible = false  
-        TargetDot.Visible = false  
-    end
-end)
-
+-- Ballistic prediction
 local function solveQuadratic(A, B, C)
-    local D = B^2 - 4*A*C
+    local D = B ^ 2 - 4 * A * C
     if D < 0 then return nil, nil end
     local s = math.sqrt(D)
-    return (-B - s)/(2*A), (-B + s)/(2*A)
+    return (-B - s) / (2 * A), (-B + s) / (2 * A)
 end
 
 local function getBallisticFlightTime(direction, gravity, speed)
     local r1, r2 = solveQuadratic(
-        gravity:Dot(gravity)/3.8,
-        gravity:Dot(direction) - speed^2,
+        gravity:Dot(gravity) / 3.8,
+        gravity:Dot(direction) - speed ^ 2,
         direction:Dot(direction)
     )
-
-    if r1 and r2 then  
-        if r1 > 0 then return math.sqrt(r1) end  
-        if r2 > 0 then return math.sqrt(r2) end  
-    end  
-
+    if r1 and r1 > 0 then return math.sqrt(r1) end
+    if r2 and r2 > 0 then return math.sqrt(r2) end
     return 0
 end
 
 local function PredictPosition(pos, vel, t, gravity)
-    return pos + vel * t + (0.001 * gravity * (t^2))
+    return pos + vel * t + (0.5 * gravity * (t ^ 2))
 end
 
 local function GetVelocity(target, pos)
     local t = tick()
+    TargetHistory[target] = TargetHistory[target] or {}
+    local hist = TargetHistory[target]
 
-    TargetHistory[target] = TargetHistory[target] or {}  
-    local hist = TargetHistory[target]  
+    if #hist >= 3 then table.remove(hist, 1) end
+    table.insert(hist, { pos = pos, time = t })
 
-    if #hist >= 3 then table.remove(hist, 1) end  
-    table.insert(hist, {pos = pos, time = t})  
-
-    if #hist < 2 then return Vector3.zero end  
-
-    local p1 = hist[#hist - 1]  
-    local p2 = hist[#hist]  
-
-    local dt = math.max(p2.time - p1.time, 1e-6)  
+    if #hist < 2 then return Vector3.zero end
+    local p1 = hist[#hist - 1]
+    local p2 = hist[#hist]
+    local dt = math.max(p2.time - p1.time, 1e-6)
     return (p2.pos - p1.pos) / dt
 end
 
+-- RenderStepped: อัปเดต FOV, เส้นชี้ 2D, และ Billboard
+RunService.RenderStepped:Connect(function()
+    -- อัปเดต FOV Circle
+    fovCircle.Visible = ShowFOV
+    if ShowFOV then
+        fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    end
+    
+    -- อัปเดต Tracer + Billboard
+    if ShowTracer and SilentAimEnabled then
+        local target = GetClosestTarget()
+        
+        if target then
+            local targetPart = GetTargetPart(target)
+            if targetPart then
+                local pos, onScreen = WorldToViewPoint(targetPart.Position)
+                local targetPos2D = Vector2.new(pos.X, pos.Y)
+                local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+                if onScreen then
+                    tracer.From = centerPos
+                    tracer.To = targetPos2D
+                    tracer.Visible = true
+
+                    if currentTarget ~= target then
+                        currentTarget = target
+                        local head = target:FindFirstChild("Head")
+                        if head then
+                            billboard.Adornee = head
+                            billboard.Enabled = true
+                        end
+                    end
+
+                    rotation = rotation + 3
+                    img.Rotation = rotation
+                else
+                    tracer.Visible = false
+                    billboard.Enabled = false
+                end
+            else
+                tracer.Visible = false
+                billboard.Enabled = false
+            end
+        else
+            tracer.Visible = false
+            billboard.Enabled = false
+            currentTarget = nil
+        end
+    else
+        tracer.Visible = false
+        billboard.Enabled = false
+    end
+end)
+
+-- Hook Network.send (ดักยิง)
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
-    local args = {...}
+    local args = { ... }
 
-    if args[1] == "shoot_gun" and SilentAimEnabled then  
-        local target = GetClosestTarget()  
+    if args[1] == "shoot_gun" and SilentAimEnabled then
+        local target = GetClosestTarget()
 
-        if target then  
-            local part = getPart(target)  
-            if part then  
-                local char = LocalPlayer.Character  
-                if not char then return OldSend(...) end  
+        if target then
+            local targetPart = GetTargetPart(target)
+            if targetPart then
+                local char = LocalPlayer.Character
+                if not char then return OldSend(...) end
 
-                local root = char:FindFirstChild("HumanoidRootPart")  
-                if not root then return OldSend(...) end  
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return OldSend(...) end
 
-                local myPos = root.Position  
-                local targetPos = part.Position  
+                local myPos = root.Position
+                local targetPos = targetPart.Position
+                local vel = GetVelocity(target, targetPos)
+                local velMagnitude = vel.Magnitude
 
-                local vel = GetVelocity(target, targetPos)  
-                local velMagnitude = vel.Magnitude  
+                local predictedPos
 
-                local predictedPos  
+                if velMagnitude >= HIGH_VEL_THRESHOLD then
+                    predictedPos = targetPos
+                else
+                    local dir = targetPos - myPos
+                    local gravity = Vector3.new(0, -workspace.Gravity, 0)
+                    local speed = 1000
+                    local t = getBallisticFlightTime(dir, gravity, speed)
+                    predictedPos = PredictPosition(targetPos, vel, t, gravity)
+                end
 
-                if velMagnitude >= HIGH_VEL_THRESHOLD then  
-                    predictedPos = targetPos  
-                else  
-                    local dir = targetPos - myPos  
-                    local gravity = Vector3.new(0, -workspace.Gravity, 0)  
-                    local speed = 1000  
+                local ignore = { LocalPlayer.Character, target }
+                local behind = IsBehindWall(myPos, predictedPos, ignore)
 
-                    local t = getBallisticFlightTime(dir, gravity, speed)  
-                    predictedPos = PredictPosition(targetPos, vel, t, gravity)  
-                end  
+                if behind then
+                    args[3] = CFrame.new(math.huge, math.huge, math.huge)
+                else
+                    args[3] = CFrame.new(myPos, predictedPos)
+                end
 
-                local ignore = {LocalPlayer.Character, target}  
-                local behind = IsBehindWall(myPos, predictedPos, ignore)  
+                for _, v in pairs(args[4] or {}) do
+                    for _, x in pairs(v) do
+                        x.Position = predictedPos
+                        x.Instance = targetPart
+                    end
+                end
 
-                if behind then  
-                    args[3] = CFrame.new(math.huge, math.huge, math.huge)  
-                else  
-                    args[3] = CFrame.new(myPos, predictedPos)  
-                end  
-
-                for _, v in pairs(args[4] or {}) do  
-                    for _, x in pairs(v) do  
-                        x.Position = predictedPos  
-                        x.Instance = part  
-                    end  
-                end  
-
-                CreateTracer(myPos, predictedPos)  
-            end  
-        end  
-    end  
+                CreateTracer(myPos, predictedPos)
+            end
+        end
+    end
 
     return OldSend(table.unpack(args))
 end)
-
-
-
-
 
 
 
@@ -1139,110 +1148,7 @@ end)
 
 -- Esp items drop
 
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local folder = workspace:WaitForChild("DroppedItems")
-
-local rarity_itemsdrop = {
-	Common = Color3.fromRGB(200,200,200),
-	Uncommon = Color3.fromRGB(86,176,62),
-	Rare = Color3.fromRGB(0,162,255),
-	Epic = Color3.fromRGB(170,85,255),
-	Legendary = Color3.fromRGB(255,170,0),
-	Omega = Color3.fromRGB(255,75,255)
-}
-
-local ItemRarityDB = {}
-local DropVisualCache = {}
-
-local function registerItems()
-	local itemsFolder = ReplicatedStorage:WaitForChild("Items")
-
-	for _, cat in ipairs({"gun","melee","throwable","consumable","farming","misc","rod","fish"}) do
-		local folderCat = itemsFolder:FindFirstChild(cat)
-		if folderCat then
-			for _, item in ipairs(folderCat:GetChildren()) do
-				ItemRarityDB[item.Name] = item:GetAttribute("RarityName") or "Common"
-			end
-		end
-	end
-end
-
-registerItems()
-
-local function getRarity(name)
-	return ItemRarityDB[name] or "Common"
-end
-
-local function getColor(name, rarity)
-	if name == "Monney" then
-		return Color3.fromRGB(0,255,0)
-	end
-	return rarity_itemsdrop[rarity] or Color3.new(1,1,1)
-end
-
-local function createVisual(item)
-	if DropVisualCache[item] then return end
-
-	local part = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
-	if not part then return end
-
-	local rarity = getRarity(item.Name)
-	local color = getColor(item.Name, rarity)
-
-	local h = Instance.new("Highlight")
-	h.Adornee = item
-	h.FillTransparency = 0.75
-	h.OutlineTransparency = 0
-	h.FillColor = color
-	h.OutlineColor = color
-	h.Parent = item
-
-	local bb = Instance.new("BillboardGui")
-	bb.Adornee = part
-	bb.Size = UDim2.new(0,130,0,40)
-	bb.StudsOffset = Vector3.new(0,2,0)
-	bb.AlwaysOnTop = true
-	bb.Parent = item
-
-	local amount = item:GetAttribute("Amount") or 1
-
-	local text = Instance.new("TextLabel")
-	text.BackgroundTransparency = 1
-	text.Size = UDim2.new(1,0,1,0)
-	text.TextScaled = true
-	text.Font = Enum.Font.SourceSansBold
-	text.TextColor3 = color
-	text.Text = item.Name .. " [" .. rarity .. "] x" .. amount
-	text.Parent = bb
-
-	DropVisualCache[item] = {
-		Highlight = h,
-		Billboard = bb
-	}
-end
-
-local function removeVisual(item)
-	if DropVisualCache[item] then
-		for _, obj in pairs(DropVisualCache[item]) do
-			obj:Destroy()
-		end
-		DropVisualCache[item] = nil
-	end
-end
-
-local ESPItemDropEnabled = false
-
-RunService.RenderStepped:Connect(function()
-	if not ESPItemDropEnabled then return end
-
-	for _, item in ipairs(folder:GetChildren()) do
-		createVisual(item)
-	end
-end)
-
-folder.ChildRemoved:Connect(removeVisual)
 
 
 
@@ -1445,6 +1351,7 @@ end)
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
+
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = false,
@@ -1458,7 +1365,7 @@ CombatTab:Toggle({
 })
 
 CombatTab:Toggle({
-    Title = "Show Tracer + Dot",
+    Title = "Show Tracer",
     Default = false,
     Callback = function(v) ShowTracer = v end
 })
@@ -1482,7 +1389,7 @@ CombatTab:Dropdown({
 })
 
 CombatTab:Dropdown({
-    Title = "Save Friend (ไม่ล็อค)",
+    Title = "Save Friend",
     Multi = true,
     Values = (function()
         local t = {}
@@ -1517,14 +1424,7 @@ EspTab:Toggle({
         end
     end
 })
-EspTab:Toggle({
-	Title = "ESP items drop",
-	Desc = "แสดงของที่ตกพื้น",
-	Default = false,
-	Callback = function(state)
-		ESPItemDropEnabled = state
-	end
-})
+
 
 local ItemsESPToggle = EspTab:Toggle({
     Title = "Items Invectorry ESP",
@@ -1639,6 +1539,8 @@ ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(sta
     end
 end})
 
+
+ChaterTab:Slider({Title = "Jump power valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
 ChaterTab:Toggle({
     Title = "Anti Aim",
     Flag = "antiaim",
@@ -1647,8 +1549,6 @@ ChaterTab:Toggle({
         getgenv().AntiAim = v
     end
 })
-ChaterTab:Slider({Title = "valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
-
 
 ChaterTab:Divider()
 
@@ -1689,7 +1589,7 @@ if not plsraknet then return end
 
 ChaterTab:Toggle({
     Title = "Desync is op ",
-    Desc = "",
+    Desc = "ล่องหน",
     Default = false,
     Callback = function(state)
         if plsraknet and plsraknet.desync then
