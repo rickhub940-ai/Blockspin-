@@ -281,15 +281,13 @@ local function GetVelocity(target, pos)
     return (p2.pos - p1.pos) / dt
 end
 
--- RenderStepped: อัปเดต FOV, เส้นชี้ 2D, และ Billboard
+
 RunService.RenderStepped:Connect(function()
-    -- อัปเดต FOV Circle
     fovCircle.Visible = ShowFOV
     if ShowFOV then
         fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     end
     
-    -- อัปเดต Tracer + Billboard
     if ShowTracer and SilentAimEnabled then
         local target = GetClosestTarget()
         
@@ -335,7 +333,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Hook Network.send (ดักยิง)
+
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = { ... }
@@ -398,137 +396,291 @@ end)
 
 
 
--- Esp เลือก
-
+-- Esp เ
 
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-
-local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
 local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-local ESPHealthEnabled = false
+
+local espPlayers = {}
+local boxESPEnabled = false
+local nameESPEnabled = false
+local distanceESPEnabled = false
+local healthESPEnabled = false
+local highlightEnabled = false
+local highlights = {}
 
 
-local function removeESP()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("Head") then
-            local esp = plr.Character.Head:FindFirstChild("HealthESP")
-            if esp then
-                esp:Destroy()
+local function createHighlight(character)
+    if not character then return nil end
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0
+    highlight.Parent = character
+    return highlight
+end
+
+local function updateHighlights()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            if not highlights[player] or not highlights[player].Parent then
+                highlights[player] = createHighlight(player.Character)
             end
         end
     end
+    for player, hl in pairs(highlights) do
+        if not player or not player.Parent or not player.Character then
+            if hl and hl.Destroy then
+                pcall(function() hl:Destroy() end)
+            end
+            highlights[player] = nil
+        end
+    end
 end
 
-local function createESP(character)
-    if not ESPHealthEnabled then return end
-
-    local head = character:FindFirstChild("Head")
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not head or not humanoid then return end
-
-    if head:FindFirstChild("HealthESP") then return end
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "HealthESP"
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(8, 0, 0.9, 0)
-    billboard.StudsOffset = Vector3.new(0, 3.8, 0)
-    billboard.AlwaysOnTop = true
-    billboard.MaxDistance = 10000
-    billboard.Parent = head
-
-    local bg = Instance.new("Frame", billboard)
-    bg.Size = UDim2.new(1,0,1,0)
-    bg.BackgroundColor3 = Color3.fromRGB(20,20,20)
-    bg.BorderSizePixel = 0
-    Instance.new("UICorner", bg).CornerRadius = UDim.new(1,0)
-
-    local stroke = Instance.new("UIStroke", bg)
-    stroke.Thickness = 2
-    stroke.Color = Color3.new(0,0,0)
-
-    local bar = Instance.new("Frame", bg)
-    bar.Size = UDim2.new(1,0,1,0)
-    bar.BorderSizePixel = 0
-    Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
-
-    local text = Instance.new("TextLabel", bg)
-    text.Size = UDim2.new(1,0,1,0)
-    text.BackgroundTransparency = 1
-    text.TextScaled = true
-    text.Font = Enum.Font.GothamBold
-    text.TextColor3 = Color3.new(1,1,1)
-    text.TextStrokeTransparency = 0
-
-    local function update()
-        if not ESPHealthEnabled then return end
-
-        local hpPercent = humanoid.Health / humanoid.MaxHealth
-
-        TweenService:Create(bar, TweenInfo.new(0.15), {
-            Size = UDim2.new(hpPercent,0,1,0)
-        }):Play()
-
-        local color
-        if hpPercent > 0.5 then
-            color = Color3.fromRGB(0,255,0)
-        elseif hpPercent > 0.25 then
-            color = Color3.fromRGB(255,170,0)
+local function createESP(player)
+    if espPlayers[player] then return end
+    
+    local lines = {}
+    for i = 1, 12 do
+        local line = Drawing.new("Line")
+        line.Color = Color3.new(1, 1, 1)
+        line.Thickness = 2
+        line.Visible = false
+        line.From = Vector2.new(0, 0)
+        line.To = Vector2.new(0, 0)
+        lines[i] = line
+    end
+    
+    local nameText = Drawing.new("Text")
+    nameText.Size = 16
+    nameText.Center = true
+    nameText.Outline = true
+    nameText.Color = Color3.fromRGB(255, 255, 255)
+    nameText.Font = 2
+    
+    local distanceText = Drawing.new("Text")
+    distanceText.Size = 14
+    distanceText.Center = true
+    distanceText.Outline = true
+    distanceText.Color = Color3.fromRGB(255, 255, 255)
+    
+    local healthBg = Drawing.new("Square")
+    healthBg.Filled = false
+    healthBg.Thickness = 1
+    healthBg.Color = Color3.fromRGB(0, 0, 0)
+    healthBg.Transparency = 1
+    healthBg.Visible = false
+    
+    local healthFg = Drawing.new("Square")
+    healthFg.Filled = true
+    healthFg.Transparency = 1
+    healthFg.Visible = false
+    
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 1
+    highlight.OutlineTransparency = 0
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = false
+    pcall(function() highlight.Parent = player.Character or Workspace end)
+    
+    local drawings = {nameText, distanceText, healthBg, healthFg, highlight}
+    for _, line in ipairs(lines) do table.insert(drawings, line) end
+    
+    local conn = RunService.RenderStepped:Connect(function()
+        if not player or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            for _, line in ipairs(lines) do line.Visible = false end
+            nameText.Visible = false
+            distanceText.Visible = false
+            healthBg.Visible = false
+            healthFg.Visible = false
+            highlight.Enabled = false
+            return
+        end
+        
+        if highlight and highlight.Parent and player.Character then
+            highlight.Adornee = player.Character
+        end
+        
+        local hrp = player.Character.HumanoidRootPart
+        local humanoid = player.Character:FindFirstChild("Humanoid")
+        
+        local dist = 0
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            dist = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+        end
+        
+        local thickness = dist > 0 and math.clamp(500 / math.max(dist, 1), 0.5, 2) or 2
+        local cf = player.Character:GetPivot()
+        local size = Vector3.new(3.5, 7, 2)
+        local halfSize = size / 2
+        
+        local corners = {
+            cf * Vector3.new(-halfSize.X, -halfSize.Y, -halfSize.Z),
+            cf * Vector3.new(-halfSize.X, -halfSize.Y, halfSize.Z),
+            cf * Vector3.new(-halfSize.X, halfSize.Y, -halfSize.Z),
+            cf * Vector3.new(-halfSize.X, halfSize.Y, halfSize.Z),
+            cf * Vector3.new(halfSize.X, -halfSize.Y, -halfSize.Z),
+            cf * Vector3.new(halfSize.X, -halfSize.Y, halfSize.Z),
+            cf * Vector3.new(halfSize.X, halfSize.Y, -halfSize.Z),
+            cf * Vector3.new(halfSize.X, halfSize.Y, halfSize.Z)
+        }
+        
+        local vp = {}
+        local minX, maxX, minY, maxY = math.huge, -math.huge, math.huge, -math.huge
+        local hasFront = false
+        
+        for i, world in ipairs(corners) do
+            local screenPos, onScreen = Camera:WorldToViewportPoint(world)
+            vp[i] = {pos = screenPos, on = onScreen}
+            if onScreen and screenPos.Z > 0 then
+                hasFront = true
+                minX = math.min(minX, screenPos.X)
+                maxX = math.max(maxX, screenPos.X)
+                minY = math.min(minY, screenPos.Y)
+                maxY = math.max(maxY, screenPos.Y)
+            end
+        end
+        
+        if not hasFront then
+            for _, line in ipairs(lines) do line.Visible = false end
+            nameText.Visible = false
+            distanceText.Visible = false
+            healthBg.Visible = false
+            healthFg.Visible = false
+            highlight.Enabled = false
+            return
+        end
+        
+        local width = maxX - minX
+        local centerX = (minX + maxX) / 2
+        
+        local boxColor = Color3.new(1, 1, 1)
+        if humanoid and humanoid.Health > 0 then
+            local perc = humanoid.Health / (humanoid.MaxHealth > 0 and humanoid.MaxHealth or 1)
+            boxColor = Color3.fromHSV(perc * 0.333, 0.5, 1)
+        end
+        
+        if boxESPEnabled then
+            local edges = {
+                {1,2},{1,3},{1,5},{2,4},{2,6},{3,4},{3,7},{4,8},{5,6},{5,7},{6,8},{7,8}
+            }
+            for i, edge in ipairs(edges) do
+                local aIdx, bIdx = edge[1], edge[2]
+                local a, b = vp[aIdx], vp[bIdx]
+                if a and b and a.on and b.on and a.pos and b.pos then
+                    lines[i].From = Vector2.new(a.pos.X, a.pos.Y)
+                    lines[i].To = Vector2.new(b.pos.X, b.pos.Y)
+                    lines[i].Color = boxColor
+                    lines[i].Thickness = thickness
+                    lines[i].Visible = true
+                else
+                    lines[i].Visible = false
+                end
+            end
         else
-            color = Color3.fromRGB(255,0,0)
+            for _, line in ipairs(lines) do line.Visible = false end
         end
-
-        bar.BackgroundColor3 = color
-        text.Text = math.floor(humanoid.Health)
-    end
-
-    humanoid.HealthChanged:Connect(update)
-    update()
-
-    local conn
-    conn = RunService.RenderStepped:Connect(function()
-        if not ESPHealthEnabled then
-            if billboard then billboard:Destroy() end
-            if conn then conn:Disconnect() end
-            return
+        
+        local currentTopY = minY
+        
+        if healthESPEnabled and humanoid and humanoid.Health > 0 then
+            local perc = humanoid.Health / (humanoid.MaxHealth > 0 and humanoid.MaxHealth or 1)
+            local barHeight = 4
+            local minBarWidth = 50
+            local barWidth = math.max(width, minBarWidth)
+            local healthX = width < minBarWidth and centerX - minBarWidth / 2 or minX
+            healthBg.Position = Vector2.new(healthX, currentTopY - barHeight - 2)
+            healthBg.Size = Vector2.new(barWidth, barHeight)
+            healthBg.Visible = true
+            healthFg.Position = Vector2.new(healthX, currentTopY - barHeight - 2)
+            healthFg.Size = Vector2.new(barWidth * perc, barHeight)
+            healthFg.Color = Color3.fromHSV(perc * 0.333, 1, 1)
+            healthFg.Visible = true
+            currentTopY = currentTopY - barHeight - 2
+        else
+            healthBg.Visible = false
+            healthFg.Visible = false
         end
-
-        if not character or not character.Parent then
-            conn:Disconnect()
-            return
-        end
-
-        local dist = (Camera.CFrame.Position - head.Position).Magnitude
-        local scale = math.clamp(30 / dist, 1.2, 4)
-
-        billboard.Size = UDim2.new(8 * scale, 0, 0.9 * scale, 0)
+        
+        nameText.Text = nameESPEnabled and player.Name or ""
+        nameText.Position = Vector2.new(centerX, currentTopY - 16)
+        nameText.Visible = nameESPEnabled
+        
+        distanceText.Text = distanceESPEnabled and string.format("%.0f studs", dist) or ""
+        distanceText.Position = Vector2.new(centerX, maxY + 4)
+        distanceText.Visible = distanceESPEnabled
+        
+        highlight.Enabled = highlightEnabled
     end)
-
-    humanoid.Died:Connect(function()
-        if conn then conn:Disconnect() end
-        billboard:Destroy()
-    end)
-end
-local function setupPlayer(player)
-    if player == LocalPlayer then return end
-
-    player.CharacterAdded:Connect(function(char)
-        task.wait(1)
-        if ESPHealthEnabled then
-            createESP(char)
-        end
-    end)
-
-    if player.Character and ESPHealthEnabled then
-        createESP(player.Character)
-    end
+    
+    espPlayers[player] = {conn = conn, drawings = drawings}
 end
 
-Players.PlayerAdded:Connect(setupPlayer)
+local function loadESP()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and not espPlayers[player] then
+            createESP(player)
+        end
+    end
+    
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= LocalPlayer then
+            player.CharacterAdded:Connect(function()
+                task.wait(0.1)
+                if not espPlayers[player] then
+                    createESP(player)
+                end
+            end)
+            if player.Character and not espPlayers[player] then
+                task.wait(0.1)
+                createESP(player)
+            end
+        end
+    end)
+    
+    Players.PlayerRemoving:Connect(function(player)
+        if espPlayers[player] then
+            for _, obj in pairs(espPlayers[player].drawings) do
+                if obj and obj.Destroy then
+                    pcall(function() obj:Destroy() end)
+                elseif typeof(obj) == "table" and obj.Visible ~= nil then
+                    obj.Visible = false
+                end
+            end
+            if espPlayers[player].conn then
+                pcall(function() espPlayers[player].conn:Disconnect() end)
+            end
+            espPlayers[player] = nil
+        end
+    end)
+end
+
+
+task.spawn(function()
+    while task.wait(1) do
+        if highlightEnabled then
+            updateHighlights()
+        end
+    end
+end)
+
+
+local ConfigManager = Window.ConfigManager
+local myConfig = ConfigManager:CreateConfig("ESPConfig")
+
+
+
+
+
 
 
 
@@ -1409,21 +1561,55 @@ CombatTab:Dropdown({
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
-EspTab:Toggle({
-    Title = "ESPHealthEnabled",
-    Desc = "แสดงเลือด",
+local BoxESPToggle = Esp:Toggle({
+    Title = "Box ESP",
+    Desc = "กล่อง4เหลี่ยมที่คนอื่น",
+    Default = false,
+    Callback = function(state) boxESPEnabled = state end
+})
+myConfig:Register("BoxESP", BoxESPToggle)
+
+local NameESPToggle = Esp:Toggle({
+    Title = "Name ESP",
+    Desc = "แสดงชื่อคนทั้งหมด",
+    Default = false,
+    Callback = function(state) nameESPEnabled = state end
+})
+myConfig:Register("NameESP", NameESPToggle)
+
+local HealthESPToggle = Esp:Toggle({
+    Title = "Health ESP",
+    Desc = "แสดงเลือดทั้งหมด",
+    Default = false,
+    Callback = function(state) healthESPEnabled = state end
+})
+myConfig:Register("HealthESP", HealthESPToggle)
+
+local DistanceESPToggle = Esp:Toggle({
+    Title = "Distance ESP",
+    Desc = "แสดงระยะห่างจากคนทังหมด",
+    Default = false,
+    Callback = function(state) distanceESPEnabled = state end
+})
+myConfig:Register("DistanceESP", DistanceESPToggle)
+
+local HighlightToggle = Tab_ESP:Toggle({
+    Title = "Highlight",
+    Desc = "ไฮไลท์ที่ตัวทุกคน",
     Default = false,
     Callback = function(state)
-        ESPHealthEnabled = state
-        if state then
-            for _, plr in ipairs(Players:GetPlayers()) do
-                setupPlayer(plr)
+        highlightEnabled = state
+        if not state then
+            for _, hl in pairs(highlights) do
+                if hl and hl.Destroy then pcall(function() hl:Destroy() end) end
             end
-        else
-            removeESP()
+            highlights = {}
         end
     end
 })
+myConfig:Register("Highlight", HighlightToggle)
+
+
 
 
 local ItemsESPToggle = EspTab:Toggle({
