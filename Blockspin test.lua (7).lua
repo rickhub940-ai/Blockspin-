@@ -1561,7 +1561,7 @@ CombatTab:Dropdown({
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
-local BoxESPToggle = Esp:Toggle({
+local BoxESPToggle = EspTab:Toggle({
     Title = "Box ESP",
     Desc = "กล่อง4เหลี่ยมที่คนอื่น",
     Default = false,
@@ -1569,7 +1569,7 @@ local BoxESPToggle = Esp:Toggle({
 })
 myConfig:Register("BoxESP", BoxESPToggle)
 
-local NameESPToggle = Esp:Toggle({
+local NameESPToggle = EspTab:Toggle({
     Title = "Name ESP",
     Desc = "แสดงชื่อคนทั้งหมด",
     Default = false,
@@ -1577,7 +1577,7 @@ local NameESPToggle = Esp:Toggle({
 })
 myConfig:Register("NameESP", NameESPToggle)
 
-local HealthESPToggle = Esp:Toggle({
+local HealthESPToggle = EspTab:Toggle({
     Title = "Health ESP",
     Desc = "แสดงเลือดทั้งหมด",
     Default = false,
@@ -1585,7 +1585,7 @@ local HealthESPToggle = Esp:Toggle({
 })
 myConfig:Register("HealthESP", HealthESPToggle)
 
-local DistanceESPToggle = Esp:Toggle({
+local DistanceESPToggle = EspTab:Toggle({
     Title = "Distance ESP",
     Desc = "แสดงระยะห่างจากคนทังหมด",
     Default = false,
@@ -1593,7 +1593,7 @@ local DistanceESPToggle = Esp:Toggle({
 })
 myConfig:Register("DistanceESP", DistanceESPToggle)
 
-local HighlightToggle = Tab_ESP:Toggle({
+local HighlightToggle = EspTab:Toggle({
     Title = "Highlight",
     Desc = "ไฮไลท์ที่ตัวทุกคน",
     Default = false,
