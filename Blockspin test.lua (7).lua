@@ -393,12 +393,13 @@ end)
 -- Esp เ
 
 
+
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-
 
 local espPlayers = {}
 local boxESPEnabled = false
@@ -407,7 +408,6 @@ local distanceESPEnabled = false
 local healthESPEnabled = false
 local highlightEnabled = false
 local highlights = {}
-
 
 local function createHighlight(character)
     if not character then return nil end
@@ -430,9 +430,7 @@ local function updateHighlights()
     end
     for player, hl in pairs(highlights) do
         if not player or not player.Parent or not player.Character then
-            if hl and hl.Destroy then
-                pcall(function() hl:Destroy() end)
-            end
+            if hl and hl.Destroy then pcall(function() hl:Destroy() end) end
             highlights[player] = nil
         end
     end
@@ -619,45 +617,42 @@ local function createESP(player)
     espPlayers[player] = {conn = conn, drawings = drawings}
 end
 
-local function loadESP()
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not espPlayers[player] then
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer and not espPlayers[player] then
+        createESP(player)
+    end
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= LocalPlayer then
+        player.CharacterAdded:Connect(function()
+            task.wait(0.1)
+            if not espPlayers[player] then
+                createESP(player)
+            end
+        end)
+        if player.Character and not espPlayers[player] then
+            task.wait(0.1)
             createESP(player)
         end
     end
-    
-    Players.PlayerAdded:Connect(function(player)
-        if player ~= LocalPlayer then
-            player.CharacterAdded:Connect(function()
-                task.wait(0.1)
-                if not espPlayers[player] then
-                    createESP(player)
-                end
-            end)
-            if player.Character and not espPlayers[player] then
-                task.wait(0.1)
-                createESP(player)
-            end
-        end
-    end)
-    
-    Players.PlayerRemoving:Connect(function(player)
-        if espPlayers[player] then
-            for _, obj in pairs(espPlayers[player].drawings) do
-                if obj and obj.Destroy then
-                    pcall(function() obj:Destroy() end)
-                elseif typeof(obj) == "table" and obj.Visible ~= nil then
-                    obj.Visible = false
-                end
-            end
-            if espPlayers[player].conn then
-                pcall(function() espPlayers[player].conn:Disconnect() end)
-            end
-            espPlayers[player] = nil
-        end
-    end)
-end
+end)
 
+Players.PlayerRemoving:Connect(function(player)
+    if espPlayers[player] then
+        for _, obj in pairs(espPlayers[player].drawings) do
+            if obj and obj.Destroy then
+                pcall(function() obj:Destroy() end)
+            elseif typeof(obj) == "table" and obj.Visible ~= nil then
+                obj.Visible = false
+            end
+        end
+        if espPlayers[player].conn then
+            pcall(function() espPlayers[player].conn:Disconnect() end)
+        end
+        espPlayers[player] = nil
+    end
+end)
 
 task.spawn(function()
     while task.wait(1) do
@@ -666,12 +661,6 @@ task.spawn(function()
         end
     end
 end)
-
-
-local ConfigManager = Window.ConfigManager
-local myConfig = ConfigManager:CreateConfig("ESPConfig")
-
-
 
 
 
@@ -1554,41 +1543,39 @@ CombatTab:Dropdown({
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
-local BoxESPToggle = EspTab:Toggle({
+
+
+EspTab:Toggle({
     Title = "Box ESP",
-    Desc = "กล่อง4เหลี่ยมที่คนอื่น",
+    Desc = "กล่องสี่เหลี่ยมทุกคน",
     Default = false,
     Callback = function(state) boxESPEnabled = state end
 })
-myConfig:Register("BoxESP", BoxESPToggle)
 
-local NameESPToggle = EspTab:Toggle({
+EspTab:Toggle({
     Title = "Name ESP",
     Desc = "แสดงชื่อคนทั้งหมด",
     Default = false,
     Callback = function(state) nameESPEnabled = state end
 })
-myConfig:Register("NameESP", NameESPToggle)
 
-local HealthESPToggle = EspTab:Toggle({
+EspTab:Toggle({
     Title = "Health ESP",
-    Desc = "แสดงเลือดทั้งหมด",
+    Desc = "แสดงแถบเลือดของทุดคน",
     Default = false,
     Callback = function(state) healthESPEnabled = state end
 })
-myConfig:Register("HealthESP", HealthESPToggle)
 
-local DistanceESPToggle = EspTab:Toggle({
+EspTab:Toggle({
     Title = "Distance ESP",
-    Desc = "แสดงระยะห่างจากคนทังหมด",
+    Desc = "แสดงระยะห่างจากทุกคน",
     Default = false,
     Callback = function(state) distanceESPEnabled = state end
 })
-myConfig:Register("DistanceESP", DistanceESPToggle)
 
-local HighlightToggle = EspTab:Toggle({
+EspTab:Toggle({
     Title = "Highlight",
-    Desc = "ไฮไลท์ที่ตัวทุกคน",
+    Desc = "ไฮไลท์สีขาวบนตัวทุกคน",
     Default = false,
     Callback = function(state)
         highlightEnabled = state
@@ -1600,9 +1587,6 @@ local HighlightToggle = EspTab:Toggle({
         end
     end
 })
-myConfig:Register("Highlight", HighlightToggle)
-
-
 
 
 local ItemsESPToggle = EspTab:Toggle({
