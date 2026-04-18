@@ -126,17 +126,15 @@ local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
 local TargetHistory = {}
 
--- ตัวแปรควบคุมจาก UI
 local SilentAimEnabled = false
 local ShowFOV = false
 local ShowTracer = false
 local FOV = 200
-local HitPart = "Head"  -- "Head" หรือ "Body"
+local HitPart = "Head"
 local SavedFriends = {}
 
 local HIGH_VEL_THRESHOLD = 250
 
--- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
@@ -144,13 +142,11 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.fromRGB(255, 255, 255)
 fovCircle.Visible = false
 
--- Tracer 2D (เส้นบนหน้าจอ)
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
 tracer.Color = Color3.fromRGB(255, 0, 0)
 tracer.Visible = false
 
--- Billboard หมุนได้
 local billboard = Instance.new("BillboardGui")
 billboard.Size = UDim2.new(0, 35, 0, 35)
 billboard.AlwaysOnTop = true
@@ -171,7 +167,6 @@ img.Parent = billboard
 local currentTarget = nil
 local rotation = 0
 
--- ฟังก์ชันช่วย
 local function WorldToViewPoint(pos)
     return Camera:WorldToViewportPoint(pos)
 end
@@ -195,7 +190,7 @@ end
 local function GetTargetPart(character)
     if HitPart == "Head" then
         return character:FindFirstChild("Head")
-    else  -- Body
+    else
         return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
     end
 end
@@ -225,7 +220,6 @@ local function GetClosestTarget()
     return closest
 end
 
--- สร้าง Tracer 3D (ตอนยิง)
 local shotToggle = false
 local function CreateTracer(fromPos, toPos)
     shotToggle = not shotToggle
@@ -243,7 +237,6 @@ local function CreateTracer(fromPos, toPos)
     Debris:AddItem(part, 3)
 end
 
--- Ballistic prediction
 local function solveQuadratic(A, B, C)
     local D = B ^ 2 - 4 * A * C
     if D < 0 then return nil, nil end
@@ -281,7 +274,6 @@ local function GetVelocity(target, pos)
     return (p2.pos - p1.pos) / dt
 end
 
-
 RunService.RenderStepped:Connect(function()
     fovCircle.Visible = ShowFOV
     if ShowFOV then
@@ -303,10 +295,10 @@ RunService.RenderStepped:Connect(function()
                     tracer.To = targetPos2D
                     tracer.Visible = true
 
-                    if currentTarget ~= target then
-                        currentTarget = target
-                        local head = target:FindFirstChild("Head")
-                        if head then
+                    local head = target:FindFirstChild("Head")
+                    if head then
+                        if currentTarget ~= target then
+                            currentTarget = target
                             billboard.Adornee = head
                             billboard.Enabled = true
                         end
@@ -332,7 +324,6 @@ RunService.RenderStepped:Connect(function()
         billboard.Enabled = false
     end
 end)
-
 
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
@@ -390,6 +381,9 @@ OldSend = hookfunction(Network.send, function(...)
 
     return OldSend(table.unpack(args))
 end)
+
+
+
 
 
 
@@ -1501,7 +1495,6 @@ end)
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
-
 
 
 CombatTab:Toggle({
