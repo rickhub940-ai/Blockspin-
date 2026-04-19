@@ -118,45 +118,61 @@ end)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-local Network = require(game.ReplicatedStorage.Modules.Core.Net)
+local Network = require(ReplicatedStorage.Modules.Core.Net)
 
 local TargetHistory = {}
+local PositionSnapshots = {}
+local TickHistory = {}
 
+-- ===============================
+-- UI CONTROLS (ปุ่มควบคุม)
+-- ===============================
 local SilentAimEnabled = false
 local ShowFOV = false
 local ShowTracer = false
+local ShowBillboard = false
 local FOV = 200
 local HitPart = "Head"
 local SavedFriends = {}
 
+-- ========== พารามิเตอร์ขั้นสูง ==========
 local HIGH_VEL_THRESHOLD = 250
+local NORMAL_PREDICTION_MULTIPLIER = 1.0
+local CAR_PREDICTION_MULTIPLIER = 1.5
+local ROLLBACK_FACTOR = 0.65
+local PING_COMPENSATION_FACTOR = 1.2
+local MAX_COMPENSATION = 2.5
+local MIN_COMPENSATION = 0.8
 
+-- ========== UI Elements ==========
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
 fovCircle.Filled = false
-fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Color = Color3.fromRGB(255,255,255)
 fovCircle.Visible = false
 
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
-tracer.Color = Color3.fromRGB(255, 0, 0)
+tracer.Color = Color3.fromRGB(255,0,0)
 tracer.Visible = false
 
+-- Billboard (รูปหมุน)
 local billboard = Instance.new("BillboardGui")
-billboard.Size = UDim2.new(0, 35, 0, 35)
+billboard.Size = UDim2.new(0,35,0,35)
 billboard.AlwaysOnTop = true
 billboard.MaxDistance = math.huge
 billboard.StudsOffset = Vector3.new(0, 0, 0)
 billboard.Enabled = false
-billboard.Parent = game.CoreGui
+billboard.Parent = game:GetService("CoreGui")
 
 local img = Instance.new("ImageLabel")
-img.Size = UDim2.new(1, 0, 1, 0)
+img.Size = UDim2.new(1,0,1,0)
 img.BackgroundTransparency = 1
 img.ScaleType = Enum.ScaleType.Fit
 img.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -166,7 +182,126 @@ img.Parent = billboard
 
 local currentTarget = nil
 local rotation = 0
+local shotToggle = false
 
+-- ===============================
+-- ฟังก์ชันอำนวยความสะดวก
+-- ===============================
+local function IsFriend(playerName)
+    return SavedFriends[playerName] == true
+end
+
+local function GetTargetPart(character)
+    if HitPart == "Head" then
+        return character:FindFirstChild("Head")
+    else
+        return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
+    end
+end
+
+local function GetVehicle(character)
+    local hum = character:FindFirstChildOfClass("Humanoid")
+    if not hum or not hum.SeatPart then return nil end
+    return hum.SeatPart:FindFirstAncestorOfClass("Model")
+end
+
+-- ===============================
+-- ระบบ Lag Compensation
+-- ===============================
+local function GetFrameRate()
+    local t = tick()
+    local fps = 60
+    if TickHistory.lastTime then
+        local delta = t - TickHistory.lastTime
+        if delta > 0 then fps = math.floor(1 / delta) end
+    end
+    TickHistory.lastTime = t
+    return math.max(fps, 30)
+end
+
+local function GetAccurateLatency()
+    local AuroraService = ReplicatedStorage:FindFirstChild("AuroraService")
+    if AuroraService and AuroraService.GetWorldStepId then
+        local ClientWorldStep = AuroraService:GetWorldStepId()
+        local ServerWorldStep = AuroraService:GetRemoteWorldStepId()
+        if ClientWorldStep and ServerWorldStep then
+            return (ClientWorldStep - ServerWorldStep) / 4
+        end
+    end
+    return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+end
+
+local function GetLagCompensation()
+    local ping = GetAccurateLatency()
+    local fps = GetFrameRate()
+    local compensation = 1 + (ping * PING_COMPENSATION_FACTOR) + (1 / fps) * 0.5
+    return math.clamp(compensation, MIN_COMPENSATION, MAX_COMPENSATION)
+end
+
+local function TakeSnapshot(character)
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local snapshot = {
+        time = tick(),
+        position = hrp.Position,
+        velocity = hrp.AssemblyLinearVelocity,
+        cframe = hrp.CFrame
+    }
+    if not PositionSnapshots[character] then PositionSnapshots[character] = {} end
+    local snapshots = PositionSnapshots[character]
+    table.insert(snapshots, snapshot)
+    while #snapshots > 0 and snapshots[1].time < tick() - 1 do
+        table.remove(snapshots, 1)
+    end
+end
+
+local function GetPositionAtTime(character, targetTime)
+    local snapshots = PositionSnapshots[character]
+    if not snapshots or #snapshots == 0 then return nil end
+    local closest = snapshots[1]
+    for _, snapshot in ipairs(snapshots) do
+        if math.abs(snapshot.time - targetTime) < math.abs(closest.time - targetTime) then
+            closest = snapshot
+        end
+    end
+    return closest
+end
+
+RunService.Heartbeat:Connect(function()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            TakeSnapshot(player.Character)
+        end
+    end
+end)
+
+-- ===============================
+-- Bullet Trail
+-- ===============================
+local function CreateBulletTrail(fromPos, toPos)
+    task.spawn(function()
+        local distance = (toPos - fromPos).Magnitude
+        local part = Instance.new("Part")
+        part.Size = Vector3.new(0.1, 0.1, distance)
+        part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance / 2)
+        part.Anchored = true
+        part.CanCollide = false
+        part.Material = Enum.Material.Neon
+        shotToggle = not shotToggle
+        part.Color = shotToggle and Color3.fromRGB(255,255,255) or Color3.fromRGB(0,0,0)
+        part.Parent = workspace
+        local ts = game:GetService("TweenService")
+        local tween = ts:Create(part, TweenInfo.new(0.5), {Transparency = 1, Size = Vector3.new(0, 0, distance)})
+        tween:Play()
+        tween.Completed:Wait()
+        part:Destroy()
+    end)
+end
+
+-- ===============================
+-- ฟังก์ชันหลัก
+-- ===============================
 local function WorldToViewPoint(pos)
     return Camera:WorldToViewportPoint(pos)
 end
@@ -183,35 +318,21 @@ local function IsBehindWall(startPos, endPos, ignore)
     return hit ~= nil
 end
 
-local function IsFriend(player)
-    return SavedFriends[player.Name] == true
-end
-
-local function GetTargetPart(character)
-    if HitPart == "Head" then
-        return character:FindFirstChild("Head")
-    else
-        return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Head")
-    end
-end
-
 local function GetClosestTarget()
     if not SilentAimEnabled then return nil end
-    
     local closest = nil
-    local dist = math.huge
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and not IsFriend(v) and v.Character and IsAlive(v.Character) then
-            local targetPart = GetTargetPart(v.Character)
+    local closestDist = FOV
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and not IsFriend(player.Name) and player.Character and IsAlive(player.Character) then
+            local targetPart = GetTargetPart(player.Character)
             if targetPart then
                 local pos, onScreen = WorldToViewPoint(targetPart.Position)
                 if onScreen then
                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if d < FOV and d < dist then
-                        closest = v.Character
-                        dist = d
+                    if d < closestDist then
+                        closestDist = d
+                        closest = player.Character
                     end
                 end
             end
@@ -220,90 +341,40 @@ local function GetClosestTarget()
     return closest
 end
 
-local shotToggle = false
-local function CreateTracer(fromPos, toPos)
-    shotToggle = not shotToggle
-    local distance = (toPos - fromPos).Magnitude
-
-    local part = Instance.new("Part")
-    part.Size = Vector3.new(0.25, 0.25, distance)
-    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance / 2)
-    part.Anchored = true
-    part.CanCollide = false
-    part.Material = Enum.Material.Neon
-    part.Color = shotToggle and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 0, 0)
-    part.Parent = workspace
-
-    Debris:AddItem(part, 3)
-end
-
-local function solveQuadratic(A, B, C)
-    local D = B ^ 2 - 4 * A * C
-    if D < 0 then return nil, nil end
-    local s = math.sqrt(D)
-    return (-B - s) / (2 * A), (-B + s) / (2 * A)
-end
-
-local function getBallisticFlightTime(direction, gravity, speed)
-    local r1, r2 = solveQuadratic(
-        gravity:Dot(gravity) / 3.8,
-        gravity:Dot(direction) - speed ^ 2,
-        direction:Dot(direction)
-    )
-    if r1 and r1 > 0 then return math.sqrt(r1) end
-    if r2 and r2 > 0 then return math.sqrt(r2) end
-    return 0
-end
-
-local function PredictPosition(pos, vel, t, gravity)
-    return pos + vel * t + (0.5 * gravity * (t ^ 2))
-end
-
-local function GetVelocity(target, pos)
-    local t = tick()
-    TargetHistory[target] = TargetHistory[target] or {}
-    local hist = TargetHistory[target]
-
-    if #hist >= 3 then table.remove(hist, 1) end
-    table.insert(hist, { pos = pos, time = t })
-
-    if #hist < 2 then return Vector3.zero end
-    local p1 = hist[#hist - 1]
-    local p2 = hist[#hist]
-    local dt = math.max(p2.time - p1.time, 1e-6)
-    return (p2.pos - p1.pos) / dt
-end
-
+-- ===============================
+-- UI Rendering (FOV, Tracer, Billboard)
+-- ===============================
 RunService.RenderStepped:Connect(function()
-    fovCircle.Visible = ShowFOV
-    if ShowFOV then
-        fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    -- FOV Circle
+    if ShowFOV and SilentAimEnabled then
+        fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        fovCircle.Visible = true
+    else
+        fovCircle.Visible = false
     end
-    
-    if ShowTracer and SilentAimEnabled then
+
+    -- Tracer และ Billboard
+    if SilentAimEnabled and ShowTracer then
         local target = GetClosestTarget()
-        
         if target then
             local targetPart = GetTargetPart(target)
             if targetPart then
                 local pos, onScreen = WorldToViewPoint(targetPart.Position)
-                local targetPos2D = Vector2.new(pos.X, pos.Y)
-                local centerPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
                 if onScreen then
+                    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                    local targetPos2D = Vector2.new(pos.X, pos.Y)
+                    
+                    -- Tracer
                     tracer.From = centerPos
                     tracer.To = targetPos2D
                     tracer.Visible = true
-
-                    local head = target:FindFirstChild("Head")
-                    if head then
-                        if currentTarget ~= target then
-                            currentTarget = target
-                            billboard.Adornee = head
-                            billboard.Enabled = true
-                        end
+                    
+                    -- Billboard
+                    if currentTarget ~= target then
+                        currentTarget = target
+                        billboard.Adornee = targetPart
+                        billboard.Enabled = true
                     end
-
                     rotation = rotation + 3
                     img.Rotation = rotation
                 else
@@ -322,69 +393,144 @@ RunService.RenderStepped:Connect(function()
     else
         tracer.Visible = false
         billboard.Enabled = false
+        currentTarget = nil
     end
 end)
 
-local OldSend
-OldSend = hookfunction(Network.send, function(...)
-    local args = { ... }
+-- ===============================
+-- Ballistic Prediction
+-- ===============================
+local function solveQuadratic(A, B, C)
+    local D = B^2 - 4*A*C
+    if D < 0 then return nil, nil end
+    local s = math.sqrt(D)
+    return (-B - s)/(2*A), (-B + s)/(2*A)
+end
 
+local function getBallisticFlightTime(direction, gravity, speed)
+    local r1, r2 = solveQuadratic(
+        gravity:Dot(gravity)/3.8,
+        gravity:Dot(direction) - speed^2,
+        direction:Dot(direction)
+    )
+    if r1 and r2 then
+        if r1 > 0 then return math.sqrt(r1) end
+        if r2 > 0 then return math.sqrt(r2) end
+    end
+    return 0
+end
+
+local function PredictPosition(pos, vel, t, gravity, multiplier)
+    return pos + (vel * t * multiplier) + (0.001 * gravity * (t^2))
+end
+
+local function GetVelocity(target, pos)
+    local t = tick()
+    TargetHistory[target] = TargetHistory[target] or {}
+    local hist = TargetHistory[target]
+    if #hist >= 3 then table.remove(hist, 1) end
+    table.insert(hist, {pos = pos, time = t})
+    if #hist < 2 then return Vector3.zero end
+    local p1 = hist[#hist-1]
+    local p2 = hist[#hist]
+    local dt = math.max(p2.time - p1.time, 1e-6)
+    return (p2.pos - p1.pos) / dt
+end
+
+-- ===============================
+-- Silent Aim Hook
+-- ===============================
+local OldSend = hookfunction(Network.send, function(...)
+    local args = {...}
     if args[1] == "shoot_gun" and SilentAimEnabled then
         local target = GetClosestTarget()
-
         if target then
-            local targetPart = GetTargetPart(target)
-            if targetPart then
+            local part = GetTargetPart(target)
+            if part then
                 local char = LocalPlayer.Character
                 if not char then return OldSend(...) end
-
                 local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return OldSend(...) end
 
                 local myPos = root.Position
-                local targetPos = targetPart.Position
+                local targetPos = part.Position
+                local ping = GetAccurateLatency()
+                local lagComp = GetLagCompensation()
+
+                local rollbackTime = ping * ROLLBACK_FACTOR
+                local snapshot = GetPositionAtTime(target, tick() - rollbackTime)
+                if snapshot and snapshot.position then
+                    targetPos = snapshot.position
+                end
+
                 local vel = GetVelocity(target, targetPos)
                 local velMagnitude = vel.Magnitude
+                local car = GetVehicle(target)
+                local predictedPos, multiplier
 
-                local predictedPos
+                local isShotgun = false
+                for _, t in ipairs(char:GetChildren()) do
+                    if t:IsA("Tool") and (t:GetAttribute("AmmoType") == "shotgun" or t:GetAttribute("AmmoType") == "shootgun") then
+                        isShotgun = true
+                        break
+                    end
+                end
 
-                if velMagnitude >= HIGH_VEL_THRESHOLD then
-                    predictedPos = targetPos
-                else
+                if car then
+                    multiplier = CAR_PREDICTION_MULTIPLIER * lagComp
                     local dir = targetPos - myPos
                     local gravity = Vector3.new(0, -workspace.Gravity, 0)
                     local speed = 1000
-                    local t = getBallisticFlightTime(dir, gravity, speed)
-                    predictedPos = PredictPosition(targetPos, vel, t, gravity)
+                    local t = getBallisticFlightTime(dir, gravity, speed) + (ping * 0.3)
+                    predictedPos = PredictPosition(targetPos, vel, t, gravity, multiplier)
+                else
+                    if velMagnitude >= HIGH_VEL_THRESHOLD then
+                        predictedPos = targetPos
+                    else
+                        multiplier = NORMAL_PREDICTION_MULTIPLIER * lagComp
+                        local dir = targetPos - myPos
+                        local gravity = Vector3.new(0, -workspace.Gravity, 0)
+                        local speed = 1000
+                        local t = getBallisticFlightTime(dir, gravity, speed) + (ping * 0.3)
+                        predictedPos = PredictPosition(targetPos, vel, t, gravity, multiplier)
+                    end
                 end
 
-                local ignore = { LocalPlayer.Character, target }
+                local ignore = {LocalPlayer.Character, target}
                 local behind = IsBehindWall(myPos, predictedPos, ignore)
 
-                if behind then
+                if isShotgun then
+                    args[3] = CFrame.new(myPos, predictedPos)
+                    local hits = {}
+                    for i = 1, 6 do
+                        local spread = Vector3.new(
+                            math.random(-2,2)*0.03,
+                            math.random(-2,2)*0.03,
+                            math.random(-2,2)*0.03
+                        )
+                        table.insert(hits, {[1] = {Instance = part, Normal = Vector3.new(0,1,0), Position = predictedPos + spread}})
+                    end
+                    args[4] = hits
+                elseif behind then
                     args[3] = CFrame.new(math.huge, math.huge, math.huge)
                 else
                     args[3] = CFrame.new(myPos, predictedPos)
+                    args[4] = {{[1] = {Instance = part, Normal = Vector3.new(0,1,0), Position = predictedPos}}}
                 end
 
                 for _, v in pairs(args[4] or {}) do
                     for _, x in pairs(v) do
-                        x.Position = predictedPos
-                        x.Instance = targetPart
+                        if x.Position then x.Position = predictedPos end
+                        if x.Instance then x.Instance = part end
                     end
                 end
 
-                CreateTracer(myPos, predictedPos)
+                CreateBulletTrail(myPos, predictedPos)
             end
         end
     end
-
     return OldSend(table.unpack(args))
 end)
-
-
-
-
 
 
 
@@ -1487,41 +1633,64 @@ end)
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
-
 CombatTab:Toggle({
     Title = "Silent Aim",
+	Desc = "กระสุนล็อคเป้า",
     Default = false,
-    Callback = function(v) SilentAimEnabled = v end
+    Callback = function(v)
+        SilentAimEnabled = v
+        if not v then
+            if fovCircle then fovCircle.Visible = false end
+            if tracer then tracer.Visible = false end
+            if billboard then billboard.Enabled = false end
+        end
+    end
 })
 
 CombatTab:Toggle({
     Title = "Show FOV",
+	Desc = "แสดงวงกลมFov",
     Default = false,
-    Callback = function(v) ShowFOV = v end
+    Callback = function(v)
+        ShowFOV = v
+    end
 })
+
 
 CombatTab:Toggle({
     Title = "Show Tracer",
+	Desc = "แสดงเส้นชี้เป้า",
     Default = false,
-    Callback = function(v) ShowTracer = v end
+    Callback = function(v)
+        ShowTracer = v
+        ShowBillboard = v
+        if not v then
+            if tracer then tracer.Visible = false end
+            if billboard then billboard.Enabled = false end
+        end
+    end
 })
 
 CombatTab:Slider({
     Title = "FOV Size",
+	Desc = "ปรับขนาดวงกลม",
     Step = 1,
-    Value = {Min = 20, Max = 500},
+    Value = {Min = 20, Max = 1000},
     Default = 200,
     Callback = function(v)
         FOV = v
-        fovCircle.Radius = v  
+        if fovCircle then fovCircle.Radius = v end
     end
 })
 
 CombatTab:Dropdown({
     Title = "Hit Part",
+	Desc = "เลือกต่ำแหน่งที่จะล็อคHeadคือหัวBodyคือตัว",
     Values = {"Head", "Body"},
     Default = "Head",
-    Callback = function(v) HitPart = v end
+    Callback = function(v)
+        HitPart = v
+    end
 })
 
 CombatTab:Dropdown({
@@ -1646,6 +1815,7 @@ ChaterTab:Section({Title = "Body"})
 local staminaConnection
 ChaterTab:Toggle({
     Title = "infinity stamina",
+    Desc = "สตามิน่าไม่จำกัด",
     Default = false,
     Callback = function(state)
         if state then
@@ -1692,7 +1862,7 @@ ChaterTab:Toggle({
 
 
 
-ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(state)
+ChaterTab:Toggle({Title = "jump power (กระโดดสูง)", Default = false, Callback = function(state)
     jumpEnabled = state
     if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
     if state then
@@ -1707,9 +1877,10 @@ ChaterTab:Toggle({Title = "jump power", Default = false, Callback = function(sta
 end})
 
 
-ChaterTab:Slider({Title = "Jump power valu", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
+ChaterTab:Slider({Title = "Jump power valu (ปรับความสูง)", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
 ChaterTab:Toggle({
     Title = "Anti Aim",
+	Desc = "กันล็อค(ถ้าเปิดจะกระโดดสูงไม่ได้)",
     Flag = "antiaim",
     Value = false,
     Callback = function(v)
@@ -1727,6 +1898,7 @@ local NetModule = require(ReplicatedStorage.Modules.Core.Net)
 local pick
 ChaterTab:Toggle({
     Title = "Auto Pickup item",
+	Desc = "ดูดของ",
     Default = false,
     Callback = function(state)
         if state then
@@ -1783,7 +1955,7 @@ end
 
 ChaterTab:Toggle({
     Title = "Anti Ragdoll",
-	Desc = "กันกระเดน",
+	Desc = "กันกระเดนเปิดแล้วจะไม่กระเดน",
     Flag = "AntiRagdoll",
     Value = false,
     Callback = function(Value)
@@ -1847,6 +2019,7 @@ end
 
 ChaterTab:Toggle({
     Title = "Snap Under Map",
+	Desc = "มุดดิน",
     Default = false,
     Callback = function(state)
         SetSnapState(state)
@@ -1855,6 +2028,7 @@ ChaterTab:Toggle({
 
 ChaterTab:Keybind({
     Title = "Snap Keybind",
+	Desc = "คีย์ลัดสำหรับPC",
     Flag = "snap_keybind",
     Value = "G",
     Callback = function()
@@ -1864,6 +2038,7 @@ ChaterTab:Keybind({
 
 ChaterTab:Slider({
     Title = "Snap Depth",
+	Desc = "ระยะในการมุด",
     Flag = "snap_height",
     Step = 1,
     Value = { Min = 1, Max = 50, Default = YoffsetValue },
@@ -1882,7 +2057,7 @@ FarmTab:Divider()
 
 FarmTab:Toggle({
     Title = "Auto Seven Eleven",
-    Desc = "ทำงาน ยกกล่อง",
+    Desc = "ออโต้ฟาม ยกกล่อง",
     Icon = "bird",
     Type = "Checkbox",
     Value = false,
@@ -2013,7 +2188,7 @@ local function createGui()
     title.Font = Enum.Font.GothamBold
     title.TextSize = 12
     title.TextColor3 = Color3.fromRGB(235,235,235)
-    title.Text = "Free camera"
+    title.Text = "ถอดจิต"
     title.TextXAlignment = Enum.TextXAlignment.Left
     local toggle = Instance.new("TextButton", frame)
     toggle.Name = "Toggle"
