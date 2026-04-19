@@ -1908,6 +1908,66 @@ ChaterTab:Slider({
     end
 })
 
+local carTab = Window:Tab({Title = "Car", Icon = "car"})
+
+carTab:Button({
+    Title = "Bring your car",
+	Desc = "ดึงรถ(ของตัวเอง)",
+    Callback = function()
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if not hrp then 
+            return 
+        end
+        
+        local vehicles = workspace:FindFirstChild("Vehicles")
+        
+        if not vehicles then 
+            return 
+        end
+        
+        local myVehicles = {}
+        
+        for _, vehicle in ipairs(vehicles:GetChildren()) do
+            if vehicle:IsA("Model") then
+                local ownerId = vehicle:GetAttribute("OwnerUserId")
+                
+                if ownerId and ownerId == LocalPlayer.UserId then
+                    table.insert(myVehicles, vehicle)
+                end
+            end
+        end
+        
+        if #myVehicles == 0 then
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "รถ",
+                Text = "ไม่พบรถของคุณ",
+                Duration = 3
+            })
+            return
+        end
+        
+        local pulled = 0
+        
+        for _, vehicle in ipairs(myVehicles) do
+            local primary = getVehicleRoot(vehicle)
+            
+            if primary then
+                primary.CFrame = CFrame.new(hrp.Position + hrp.CFrame.LookVector * 4) 
+                    * CFrame.Angles(0, math.rad(hrp.Orientation.Y), 0)
+                
+                pulled = pulled + 1
+                task.wait(0.1)
+            end
+        end
+        
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "รถ",
+            Text = "ดึงรถของคุณ " .. pulled .. " คัน",
+            Duration = 3
+        })
+    end
+})
 
 
 local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
