@@ -1910,64 +1910,71 @@ ChaterTab:Slider({
 
 local carTab = Window:Tab({Title = "Car", Icon = "car"})
 
-carTab:Button({
-    Title = "Bring your car",
-	Desc = "ดึงรถ(ของตัวเอง)",
-    Callback = function()
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        
-        if not hrp then 
-            return 
-        end
-        
-        local vehicles = workspace:FindFirstChild("Vehicles")
-        
-        if not vehicles then 
-            return 
-        end
-        
-        local myVehicles = {}
-        
-        for _, vehicle in ipairs(vehicles:GetChildren()) do
-            if vehicle:IsA("Model") then
-                local ownerId = vehicle:GetAttribute("OwnerUserId")
-                
-                if ownerId and ownerId == LocalPlayer.UserId then
-                    table.insert(myVehicles, vehicle)
+
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local function getVehicleRoot(vehicle)
+    local p = vehicle.PrimaryPart
+        or vehicle:FindFirstChild("PrimaryPart")
+        or vehicle:FindFirstChild("Chassis")
+        or vehicle:FindFirstChild("HumanoidRootPart")
+        or vehicle:FindFirstChild("VehicleSeat")
+        or vehicle:FindFirstChild("Body")
+        or vehicle:FindFirstChild("Frame")
+    if p and p:IsA("BasePart") then return p end
+    for _, part in ipairs(vehicle:GetDescendants()) do
+        if part:IsA("VehicleSeat") then return part end
+    end
+    for _, part in ipairs(vehicle:GetChildren()) do
+        if part:IsA("BasePart") then return part end
+    end
+    return nil
+end
+
+local function PullMyVehicleOnly()
+    local vehicles = workspace:FindFirstChild("Vehicles")
+    if not vehicles then return end
+    
+    for _, vehicle in ipairs(vehicles:GetChildren()) do
+        if vehicle:IsA("Model") then
+            local ownerId = vehicle:GetAttribute("OwnerUserId")
+            if ownerId and ownerId == LocalPlayer.UserId then
+                local primary = getVehicleRoot(vehicle)
+                if primary then
+                    vehicle:SetPrimaryPartCFrame(rootPart.CFrame * CFrame.new(0, 0, -5))
+                    WindUI:Notify({
+                        Title = "ดึงรถสำเร็จ",
+                        Content = "ดึงรถ " .. vehicle.Name .. " มาแล้ว",
+                        Duration = 2,
+                        Icon = "car"
+                    })
+                    return
                 end
             end
         end
-        
-        if #myVehicles == 0 then
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "รถ",
-                Text = "ไม่พบรถของคุณ",
-                Duration = 3
-            })
-            return
-        end
-        
-        local pulled = 0
-        
-        for _, vehicle in ipairs(myVehicles) do
-            local primary = getVehicleRoot(vehicle)
-            
-            if primary then
-                primary.CFrame = CFrame.new(hrp.Position + hrp.CFrame.LookVector * 4) 
-                    * CFrame.Angles(0, math.rad(hrp.Orientation.Y), 0)
-                
-                pulled = pulled + 1
-                task.wait(0.1)
-            end
-        end
-        
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "รถ",
-            Text = "ดึงรถของคุณ " .. pulled .. " คัน",
-            Duration = 3
-        })
+    end
+    
+    WindUI:Notify({
+        Title = "ไม่พบรถ",
+        Content = "ไม่พบรถที่เป็นของคุณ",
+        Duration = 2,
+        Icon = "car"
+    })
+end
+
+
+carTab:Button({
+    Title = "Bring your car", 
+    Desc = "ดึงรถ(ของตัวเอง)", 
+    Callback = function()
+        PullMyVehicleOnly()
     end
 })
+
 
 
 local FarmTab = Window:Tab({Title = "FARM", Icon = "hand-coins"})
