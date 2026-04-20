@@ -124,55 +124,28 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ตัวแปรที่ควบคุมโดยปุ่ม
-local SilentAimEnabled = false
+local SilentAim = true
+local Tracer = true
 local ShowFOV = false
-local ShowTracer = false
-local FOV = 200
+local FOV = 150
 local HitPart = "Head"
-local SavedFriends = {}
+local Friends = {}
 
 local PRED_NORMAL = 0.12
-local PRED_CAR = 0.15
+local PRED_CAR = 0.12
 local VELOCITY_LIMIT = 250
 
--- ตัวเลือกสำหรับลูกซอง
-local SHOTGUN_SPREAD = 0.03
-local SHOTGUN_PELLETS = 6
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Color = Color3.new(1,1,1)
+FOVCircle.Thickness = 2
+FOVCircle.NumSides = 100
+FOVCircle.Filled = false
+FOVCircle.Visible = ShowFOV
 
--- FOV Circle
-local fovCircle = Drawing.new("Circle")
-fovCircle.Radius = FOV
-fovCircle.Thickness = 1
-fovCircle.Filled = false
-fovCircle.Color = Color3.fromRGB(255,255,255)
-fovCircle.Visible = false
-
--- Tracer
-local tracer = Drawing.new("Line")
-tracer.Thickness = 2
-tracer.Color = Color3.fromRGB(255,0,0)
-tracer.Visible = false
-
--- Billboard (ตัวหมุน)
-local billboard = Instance.new("BillboardGui")
-billboard.Size = UDim2.new(0,35,0,35)
-billboard.AlwaysOnTop = true
-billboard.MaxDistance = math.huge
-billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-billboard.Enabled = false
-billboard.Parent = game.CoreGui
-
-local img = Instance.new("ImageLabel")
-img.Size = UDim2.new(1,0,1,0)
-img.BackgroundTransparency = 1
-img.ScaleType = Enum.ScaleType.Fit
-img.AnchorPoint = Vector2.new(0.5, 0.5)
-img.Position = UDim2.new(0.5, 0, 0.5, 0)
-img.Image = "rbxassetid://131244894073789"
-img.Parent = billboard
-
-local currentTarget = nil
-local rotation = 0
+local CenterLine = Drawing.new("Line")
+CenterLine.Color = Color3.new(1,0,0)
+CenterLine.Thickness = 2
+CenterLine.Visible = false
 
 local ToggleShot = false
 local function drawShot(fromPos,toPos)
@@ -185,7 +158,7 @@ local function drawShot(fromPos,toPos)
     p.Color = ToggleShot and Color3.fromRGB(255,255,255) or Color3.fromRGB(0,0,0)
 
     local dist = (toPos - fromPos).Magnitude
-    p.Size = Vector3.new(0.25,0.25,dist)
+    p.Size = Vector3.new(0.1,0.1,dist)
     p.CFrame = CFrame.new(fromPos,toPos) * CFrame.new(0,0,-dist/2)
 
     p.Parent = Workspace
@@ -216,10 +189,10 @@ end
 
 local function getClosest()
     local best,dist = nil,math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local center = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
 
     for _,plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and not SavedFriends[plr.Name] and plr.Character then
+        if plr ~= LocalPlayer and not Friends[plr.Name] and plr.Character then
             local part = getPart(plr.Character)
             if part then
                 local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
@@ -280,7 +253,7 @@ local old
 old = hookfunction(Remote.FireServer,function(self,...)
     local args = {...}
 
-    if SilentAimEnabled then
+    if SilentAim then
         local target = getClosest()
 
         if target and target.Character then
@@ -297,30 +270,24 @@ old = hookfunction(Remote.FireServer,function(self,...)
                 local isShotgun = isShotgunWeapon()
                 local myPos = myHead.Position
 
-                if wallCheck(myPos, predPos, target.Character) then
-                    args[4] = CFrame.new(math.huge, math.huge, math.huge)
-                else
-                    args[4] = CFrame.new(myPos, predPos)
-                end
-
+                -- ลูกซอง: ไม่ต้องยิงทะลุ (ไม่ต้องทำ wallcheck แบบยิงทะลุ)
                 if isShotgun then
-                    local hits = {}
-                    for i = 1, SHOTGUN_PELLETS do
-                        local spread = Vector3.new(
-                            math.random(-2, 2) * SHOTGUN_SPREAD,
-                            math.random(-2, 2) * SHOTGUN_SPREAD,
-                            math.random(-2, 2) * SHOTGUN_SPREAD
-                        )
-                        table.insert(hits, {
+                    args[4] = CFrame.new(myPos, predPos)
+                    args[5] = {
+                        [1] = {
                             [1] = {
                                 Instance = part,
-                                Normal = Vector3.new(0, 1, 0),
-                                Position = predPos + spread
+                                Position = predPos
                             }
-                        })
-                    end
-                    args[5] = hits
+                        }
+                    }
                 else
+                    -- ปืนปกติ: ถ้ามีกำแพงบังให้ยิงทะลุ
+                    if wallCheck(myPos, predPos, target.Character) then
+                        args[4] = CFrame.new(math.huge, math.huge, math.huge)
+                    else
+                        args[4] = CFrame.new(myPos, predPos)
+                    end
                     args[5] = {
                         [1] = {
                             [1] = {
@@ -338,59 +305,32 @@ old = hookfunction(Remote.FireServer,function(self,...)
 end)
 
 RunService.RenderStepped:Connect(function()
-    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    
-    -- FOV Circle
-    fovCircle.Position = centerPos
-    fovCircle.Visible = ShowFOV and SilentAimEnabled
-    fovCircle.Radius = FOV
-    
-    -- Tracer และ Billboard
-    if ShowTracer and SilentAimEnabled then
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    FOVCircle.Visible = ShowFOV and SilentAim
+    FOVCircle.Position = center
+    FOVCircle.Radius = FOV
+
+    CenterLine.Visible = false
+
+    if Tracer then
         local target = getClosest()
-        
         if target and target.Character then
-            local headPart = target.Character:FindFirstChild("Head")
-            if headPart then
-                local pos, onScreen = Camera:WorldToViewportPoint(headPart.Position)
-                local targetPos2D = Vector2.new(pos.X, pos.Y)
-                
+            local part = getPart(target.Character)
+            if part then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    -- Tracer
-                    tracer.From = centerPos
-                    tracer.To = targetPos2D
-                    tracer.Visible = true
-                    
-                    -- Billboard
-                    if currentTarget ~= target.Character then
-                        currentTarget = target.Character
-                        billboard.Adornee = headPart
-                        billboard.Enabled = true
-                    end
-                    
-                    -- หมุน
-                    rotation = rotation + 3
-                    img.Rotation = rotation
-                else
-                    tracer.Visible = false
-                    billboard.Enabled = false
+                    CenterLine.From = center
+                    CenterLine.To = Vector2.new(pos.X, pos.Y)
+                    CenterLine.Visible = true
                 end
-            else
-                tracer.Visible = false
-                billboard.Enabled = false
-                currentTarget = nil
             end
-        else
-            tracer.Visible = false
-            billboard.Enabled = false
-            currentTarget = nil
         end
-    else
-        tracer.Visible = false
-        billboard.Enabled = false
-        currentTarget = nil
     end
 end)
+
+
+
 
 
 
@@ -1490,15 +1430,15 @@ end)
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
+
+
 CombatTab:Toggle({
     Title = "Silent Aim",
-    Default = false,
+    Default = true,
     Callback = function(v)
-        SilentAimEnabled = v
+        SilentAim = v
     end
 })
-
-
 CombatTab:Toggle({
     Title = "Show FOV",
     Default = false,
@@ -1507,16 +1447,11 @@ CombatTab:Toggle({
     end
 })
 
-
 CombatTab:Toggle({
     Title = "Show Tracer",
-    Default = false,
+    Default = true,
     Callback = function(v)
-        ShowTracer = v
-        if not v then
-            billboard.Enabled = false
-            currentTarget = nil
-        end
+        Tracer = v
     end
 })
 
@@ -1525,13 +1460,12 @@ CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
     Value = {Min = 20, Max = 500},
-    Default = 200,
+    Default = 150,
     Callback = function(v)
         FOV = v
-        if fovCircle then fovCircle.Radius = v end
+        if FOVCircle then FOVCircle.Radius = v end
     end
 })
-
 
 CombatTab:Dropdown({
     Title = "Hit Part",
@@ -1554,24 +1488,12 @@ CombatTab:Dropdown({
         return t
     end)(),
     Callback = function(list)
-        SavedFriends = {}
+        Friends = {}
         for _, name in pairs(list) do
-            SavedFriends[name] = true
+            Friends[name] = true
         end
     end
 })
-
--- อัปเดตรายชื่อเพื่อนเมื่อมีผู้เล่นเข้า/ออก
-Players.PlayerAdded:Connect(function(player)
-    if player ~= LocalPlayer then
-        -- สามารถอัปเดต dropdown ได้ที่นี่
-    end
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    SavedFriends[player.Name] = nil
-end)
-
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
