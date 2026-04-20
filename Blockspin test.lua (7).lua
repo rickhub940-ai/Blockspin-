@@ -113,7 +113,6 @@ end)
 
 -- Silent aim
 
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -124,15 +123,15 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- ตัวแปรที่ควบคุมโดยปุ่ม
-local SilentAim = true
+local SilentAim = false
 local Tracer = true
-local ShowFOV = false
-local FOV = 150
+local ShowFOV = true
+local FOV = 200
 local HitPart = "Head"
 local Friends = {}
 
 local PRED_NORMAL = 0.12
-local PRED_CAR = 0.12
+local PRED_CAR = 0.15
 local VELOCITY_LIMIT = 250
 
 local FOVCircle = Drawing.new("Circle")
@@ -147,22 +146,22 @@ CenterLine.Color = Color3.new(1,0,0)
 CenterLine.Thickness = 2
 CenterLine.Visible = false
 
-local ToggleShot = false
-local function drawShot(fromPos,toPos)
-    ToggleShot = not ToggleShot
+local shotToggle = false
 
-    local p = Instance.new("Part")
-    p.Anchored = true
-    p.CanCollide = false
-    p.Material = Enum.Material.Neon
-    p.Color = ToggleShot and Color3.fromRGB(255,255,255) or Color3.fromRGB(0,0,0)
+local function CreateTracer(fromPos, toPos)
+    shotToggle = not shotToggle
+    local distance = (toPos - fromPos).Magnitude
 
-    local dist = (toPos - fromPos).Magnitude
-    p.Size = Vector3.new(0.1,0.1,dist)
-    p.CFrame = CFrame.new(fromPos,toPos) * CFrame.new(0,0,-dist/2)
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(0.25, 0.25, distance)
+    part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = shotToggle and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
+    part.Parent = workspace
 
-    p.Parent = Workspace
-    Debris:AddItem(p,1.5)
+    Debris:AddItem(part, 3)
 end
 
 local function isShotgunWeapon()
@@ -253,7 +252,10 @@ local old
 old = hookfunction(Remote.FireServer,function(self,...)
     local args = {...}
 
-    if SilentAim then
+    -- เช็คว่าเป็นการยิงปืนจริงๆ เท่านั้น
+    local isShooting = args[2] == "shoot_gun" or args[2] == "shoot" or string.find(tostring(args[2]), "shoot")
+
+    if SilentAim and isShooting then
         local target = getClosest()
 
         if target and target.Character then
@@ -265,12 +267,12 @@ old = hookfunction(Remote.FireServer,function(self,...)
                 local pred = getPred(hrp, target.Character)
                 local predPos = part.Position + hrp.AssemblyLinearVelocity * pred
 
-                drawShot(myHead.Position,predPos)
+                -- สร้างเอฟเฟคกระสุนเฉพาะตอนยิงเท่านั้น
+                CreateTracer(myHead.Position, predPos)
 
                 local isShotgun = isShotgunWeapon()
                 local myPos = myHead.Position
 
-                -- ลูกซอง: ไม่ต้องยิงทะลุ (ไม่ต้องทำ wallcheck แบบยิงทะลุ)
                 if isShotgun then
                     args[4] = CFrame.new(myPos, predPos)
                     args[5] = {
@@ -282,7 +284,6 @@ old = hookfunction(Remote.FireServer,function(self,...)
                         }
                     }
                 else
-                    -- ปืนปกติ: ถ้ามีกำแพงบังให้ยิงทะลุ
                     if wallCheck(myPos, predPos, target.Character) then
                         args[4] = CFrame.new(math.huge, math.huge, math.huge)
                     else
@@ -328,6 +329,8 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+
+
 
 
 
@@ -1439,6 +1442,8 @@ CombatTab:Toggle({
         SilentAim = v
     end
 })
+
+
 CombatTab:Toggle({
     Title = "Show FOV",
     Default = false,
@@ -1446,6 +1451,7 @@ CombatTab:Toggle({
         ShowFOV = v
     end
 })
+
 
 CombatTab:Toggle({
     Title = "Show Tracer",
@@ -1466,6 +1472,7 @@ CombatTab:Slider({
         if FOVCircle then FOVCircle.Radius = v end
     end
 })
+
 
 CombatTab:Dropdown({
     Title = "Hit Part",
@@ -1494,6 +1501,7 @@ CombatTab:Dropdown({
         end
     end
 })
+
 
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
