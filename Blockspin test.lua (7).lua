@@ -122,10 +122,10 @@ local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- ตัวแปรที่ควบคุมโดยปุ่ม
+
 local SilentAim = false
-local Tracer = true
-local ShowFOV = true
+local Tracer = false
+local ShowFOV = false
 local FOV = 200
 local HitPart = "Head"
 local Friends = {}
