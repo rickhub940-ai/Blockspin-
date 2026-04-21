@@ -615,233 +615,7 @@ end)
 
 
 
--- Esp items 
 
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-
-local EspitemsEnabled = false
-local BillboardCache = {}
-local WeaponDB = {}
-local Connections = {}
-local espCharConnection = nil
-local UpdateCooldown = {}
-
-local RARITY_COLORS = {
-    ["Common"] = Color3.fromRGB(200,200,200),
-    ["Uncommon"] = Color3.fromRGB(86,176,62),
-    ["Rare"] = Color3.fromRGB(0,162,255),
-    ["Epic"] = Color3.fromRGB(170,85,255),
-    ["Legendary"] = Color3.fromRGB(255,170,0),
-    ["Omega"] = Color3.fromRGB(255,75,75)
-}
-
-local function registerItems(folder)
-    for _, tool in ipairs(folder:GetChildren()) do
-        local handle = tool:FindFirstChild("Handle")
-        local key
-
-        if handle then
-            local mesh = handle:FindFirstChildOfClass("SpecialMesh")
-            if mesh then
-                key = mesh.MeshId .. (mesh.TextureId or "")
-            elseif handle:IsA("MeshPart") then
-                key = handle.MeshId .. (handle.TextureID or "")
-            end
-        end
-
-        if key then
-            WeaponDB[key] = {
-                Name = tool:GetAttribute("DisplayName") or tool.Name,
-                Rarity = tool:GetAttribute("RarityName") or "Common",
-                ImageId = tool:GetAttribute("ImageId") or "rbxassetid://7072725737"
-            }
-        else
-            WeaponDB[tool.Name] = {
-                Name = tool:GetAttribute("DisplayName") or tool.Name,
-                Rarity = tool:GetAttribute("RarityName") or "Common",
-                ImageId = tool:GetAttribute("ImageId") or "rbxassetid://7072725737"
-            }
-        end
-    end
-end
-
-local function getMeshId(tool)
-    local handle = tool:FindFirstChild("Handle")
-    if not handle then return nil end
-
-    local mesh = handle:FindFirstChildOfClass("SpecialMesh")
-    if mesh then
-        return mesh.MeshId .. (mesh.TextureId or "")
-    end
-
-    if handle:IsA("MeshPart") then
-        return handle.MeshId .. (handle.TextureID or "")
-    end
-
-    return nil
-end
-
-local function getWeaponInfo(tool)
-    local meshId = getMeshId(tool)
-    if meshId and WeaponDB[meshId] then
-        return WeaponDB[meshId]
-    elseif WeaponDB[tool.Name] then
-        return WeaponDB[tool.Name]
-    end
-end
-
-local function clearConnections(player)
-    if Connections[player] then
-        for _,c in ipairs(Connections[player]) do
-            pcall(function() c:Disconnect() end)
-        end
-    end
-    Connections[player] = {}
-end
-
-local function createBillboardForPlayer(player)
-    if not EspitemsEnabled or player == LocalPlayer then
-        if BillboardCache[player] then
-            BillboardCache[player]:Destroy()
-            BillboardCache[player] = nil
-        end
-        return
-    end
-
-    local char = player.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local billboard = BillboardCache[player]
-
-    if not billboard then
-        billboard = Instance.new("BillboardGui")
-        billboard.Adornee = hrp
-        billboard.Size = UDim2.new(0,200,0,25)
-        billboard.StudsOffset = Vector3.new(0,-5,0)
-        billboard.AlwaysOnTop = true
-        billboard.Parent = char
-
-        local layout = Instance.new("UIListLayout")
-        layout.FillDirection = Enum.FillDirection.Horizontal
-        layout.Padding = UDim.new(0,5)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        layout.Parent = billboard
-
-        BillboardCache[player] = billboard
-    end
-
-    for _,v in ipairs(billboard:GetChildren()) do
-        if v:IsA("ImageLabel") then
-            v:Destroy()
-        end
-    end
-
-    local tools = {}
-
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _,t in ipairs(backpack:GetChildren()) do
-            if t:IsA("Tool") and t.Name ~= "Fists" then
-                table.insert(tools,t)
-            end
-        end
-    end
-
-    for _,t in ipairs(char:GetChildren()) do
-        if t:IsA("Tool") and t.Name ~= "Fists" then
-            table.insert(tools,t)
-        end
-    end
-
-    billboard.Size = UDim2.new(0, math.max(50,#tools*25),0,25)
-
-    for _,tool in ipairs(tools) do
-        local info = getWeaponInfo(tool)
-
-        local img = Instance.new("ImageLabel")
-        img.Size = UDim2.new(0,20,0,20)
-        img.BackgroundTransparency = 0.1
-        img.Image = info and info.ImageId or "rbxassetid://7072725737"
-        img.BackgroundColor3 = Color3.fromRGB(240,248,255)
-        img.Parent = billboard
-
-        Instance.new("UICorner", img).CornerRadius = UDim.new(0,10)
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = info and RARITY_COLORS[info.Rarity] or Color3.new(1,1,1)
-        stroke.Thickness = 2
-        stroke.Parent = img
-    end
-end
-
-local function requestUpdate(player)
-    if UpdateCooldown[player] then return end
-    UpdateCooldown[player] = true
-
-    task.delay(0.15, function()
-        UpdateCooldown[player] = nil
-        createBillboardForPlayer(player)
-    end)
-end
-
-local function hookInventory(player)
-    clearConnections(player)
-    local cons = {}
-    Connections[player] = cons
-
-    local function hookChar(char)
-        if BillboardCache[player] then
-            BillboardCache[player]:Destroy()
-            BillboardCache[player] = nil
-        end
-
-        table.insert(cons, char.ChildAdded:Connect(function() requestUpdate(player) end))
-        table.insert(cons, char.ChildRemoved:Connect(function() requestUpdate(player) end))
-
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            table.insert(cons, hum.Died:Connect(function()
-                if BillboardCache[player] then
-                    BillboardCache[player]:Destroy()
-                    BillboardCache[player] = nil
-                end
-            end))
-        end
-
-        task.wait(0.2)
-        requestUpdate(player)
-    end
-
-    table.insert(cons, player.CharacterAdded:Connect(function(char)
-        char:WaitForChild("HumanoidRootPart",5)
-        hookChar(char)
-    end))
-
-    if player.Character then
-        hookChar(player.Character)
-    end
-
-    local backpack = player:WaitForChild("Backpack",5)
-    if backpack then
-        table.insert(cons, backpack.ChildAdded:Connect(function() requestUpdate(player) end))
-        table.insert(cons, backpack.ChildRemoved:Connect(function() requestUpdate(player) end))
-    end
-end
-
-for _, category in ipairs({"gun","melee","throwable","consumable","farming","misc","rod","fish"}) do
-    local folder = ReplicatedStorage:FindFirstChild("Items")
-    if folder then
-        local cat = folder:FindFirstChild(category)
-        if cat then
-            registerItems(cat)
-        end
-    end
-end
 
 
 
@@ -1796,50 +1570,164 @@ EspTab:Toggle({
         end
     end
 })
-local ItemsESPToggle = EspTab:Toggle({
-    Title = "Items Inventory ESP",
-    Desc = "แสดงไอเท็มในกระเป๋าทุกคน",
-    Default = false,
-    Callback = function(state)
-        EspitemsEnabled = state
+EspTab:Toggle({
+	Title = 'Esp Inventory',
+	Desc = "แสดงไอเท็มในกระเป๋าทุกคน",
+	Default = true,
+	Callback = function(Value)
+		_G.InventoryViewerEnabled = Value
+		local Players = game:GetService('Players')
+		local ReplicatedStorage = game:GetService('ReplicatedStorage')
+		local Client = Players.LocalPlayer
+		local function GetColorFromRarity(rarityName)
+			local colors = {
+				["Common"] = Color3.fromRGB(200, 200, 200),
+				["Uncommon"] = Color3.fromRGB(86, 176, 62),
+				["Rare"] = Color3.fromRGB(0, 162, 255),
+				["Epic"] = Color3.fromRGB(170, 85, 255),
+				["Legendary"] = Color3.fromRGB(255, 170, 0),
+				["Omega"] = Color3.fromRGB(255, 75, 75)
+			}
+			return colors[rarityName] or Color3.fromRGB(255, 255, 255)
+		end
 
-        if state then
-            for _,p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    hookInventory(p)
-                    createBillboardForPlayer(p)
-                end
-            end
+		if Value then
+			if not _G.ViewerRunning then
+				_G.ViewerRunning = true
+				task.spawn(function()
+					while task.wait(0.2) do
+						if not _G.InventoryViewerEnabled then
+							continue
+						end
+						pcall(function()
+							for _, v in pairs(Players:GetPlayers()) do
+								if v ~= Client and v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
+									local root = v.Character.HumanoidRootPart
+									local gui = root:FindFirstChild('ItemBillboard')
+									if not gui then
+										gui = Instance.new('BillboardGui')
+										gui.Name = 'ItemBillboard'
+										gui.AlwaysOnTop = true
+										gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+										gui.Size = UDim2.new(0, 200, 0, 50)
+										gui.StudsOffset = Vector3.new(0, -5, 0)
+										gui.ExtentsOffset = Vector3.new(0, 1, 0)
+										gui.LightInfluence = 1
+										gui.Parent = root
 
-            espCharConnection = Players.PlayerAdded:Connect(function(p)
-                p:WaitForChild("Backpack",5)
-                hookInventory(p)
+										local bg = Instance.new('Frame')
+										bg.Name = 'BG'
+										bg.BackgroundTransparency = 1
+										bg.Size = UDim2.new(1, 0, 1, 0)
+										bg.AnchorPoint = Vector2.new(0.5, 0.5)
+										bg.Position = UDim2.new(0.5, 0, 0.5, 0)
+										bg.Parent = gui
 
-                p.CharacterAdded:Connect(function()
-                    task.wait(0.3)
-                    if EspitemsEnabled then
-                        createBillboardForPlayer(p)
-                    end
-                end)
-            end)
+										local layout = Instance.new('UIListLayout')
+										layout.FillDirection = Enum.FillDirection.Horizontal
+										layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+										layout.VerticalAlignment = Enum.VerticalAlignment.Center
+										layout.Padding = UDim.new(0, 5)
+										layout.Parent = bg
+									end
 
-        else
-            if espCharConnection then
-                espCharConnection:Disconnect()
-                espCharConnection = nil
-            end
+									local bg = gui:FindFirstChild('BG')
+									if not bg then
+										continue
+									end
 
-            for _,p in ipairs(Players:GetPlayers()) do
-                clearConnections(p)
-            end
+									local Items = {}
 
-            for _,v in pairs(BillboardCache) do
-                pcall(function() v:Destroy() end)
-            end
+									for _, child in pairs(bg:GetChildren()) do
+										if child:IsA('Frame') then
+											child:Destroy()
+										end
+									end
 
-            BillboardCache = {}
-        end
-    end
+									-- loop item ใน backpack + character
+									for _, container in pairs({
+										v:FindFirstChild('Backpack'),
+										v.Character
+									}) do
+										if container then
+											for _, tool in pairs(container:GetChildren()) do
+												if tool:IsA('Tool') and not tool:GetAttribute('JobTool') and not tool:GetAttribute('Locked') then
+													local itemFolder = tool:GetAttribute('AmmoType') and ReplicatedStorage.Items.gun or ReplicatedStorage.Items.melee
+													for _, z in pairs(itemFolder:GetChildren()) do
+														if tool:GetAttribute('RarityName') == z:GetAttribute('RarityName') and tool:GetAttribute('RarityPrice') == z:GetAttribute('RarityPrice') then
+															local imageId = z:GetAttribute('ImageId')
+															if imageId then
+																Items[z.Name] = true
+																if not bg:FindFirstChild(z.Name .. '_bg') then
+																	local iconBg = Instance.new('Frame')
+																	iconBg.Name = z.Name .. '_bg'
+																	iconBg.Size = UDim2.new(0, 34, 0, 34)
+																	iconBg.BackgroundColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
+																	iconBg.BackgroundTransparency = 1
+																	iconBg.BorderSizePixel = 0
+																	iconBg.Parent = bg
+
+																	local bgImage = Instance.new('ImageLabel')
+																	bgImage.Name = 'Background'
+																	bgImage.Size = UDim2.new(1, 0, 1, 0)
+																	bgImage.BackgroundTransparency = 1
+																	bgImage.Image = 'rbxassetid://137066731814190'
+																	bgImage.ImageColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
+																	bgImage.ZIndex = 0
+																	bgImage.Parent = iconBg
+
+																	local corner = Instance.new('UICorner')
+																	corner.CornerRadius = UDim.new(0.15, 0)
+																	corner.Parent = iconBg
+
+																	local icon = Instance.new('ImageLabel')
+																	icon.Name = z.Name
+																	icon.Image = imageId
+																	icon.BackgroundTransparency = 1
+																	icon.BorderSizePixel = 0
+																	icon.Size = UDim2.new(0.85, 0, 0.85, 0)
+																	icon.Position = UDim2.new(0.075, 0, 0.075, 0)
+																	icon.Parent = iconBg
+
+																	local corner2 = Instance.new('UICorner')
+																	corner2.CornerRadius = UDim.new(0, 9)
+																	corner2.Parent = icon
+																end
+															end
+														end
+													end
+												end
+											end
+										end
+									end
+
+									gui.Enabled = _G.InventoryViewerEnabled
+
+									for _, child in pairs(bg:GetChildren()) do
+										if child:IsA('Frame') then
+											local itemName = child.Name:gsub('_bg$', '')
+											if not Items[itemName] then
+												child:Destroy()
+											end
+										end
+									end
+								end
+							end
+						end)
+					end
+				end)
+			end
+		else
+			for _, v in pairs(Players:GetPlayers()) do
+				if v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
+					local gui = v.Character.HumanoidRootPart:FindFirstChild('ItemBillboard')
+					if gui then
+						gui:Destroy()
+					end
+				end
+			end
+		end
+	end  
 })
 
 
