@@ -1,6 +1,5 @@
 
 
-
 local WindUI = loadstring(game:HttpGet(
 "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
@@ -18,7 +17,7 @@ local Window = WindUI:CreateWindow({
     Author = "Dipper TEAM",
     Folder = "N HUB",
     Size = UDim2.fromOffset(700, 540),
-    Background = "rbxassetid://105861983128679",
+    Background = "rbxassetid://124013844566613",
     Transparent = true,
     Resizable = true,
 
