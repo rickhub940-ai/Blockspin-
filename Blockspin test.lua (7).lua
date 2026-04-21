@@ -617,6 +617,7 @@ end)
 
 -- Esp items 
 
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
@@ -626,6 +627,7 @@ local BillboardCache = {}
 local WeaponDB = {}
 local Connections = {}
 local espCharConnection = nil
+local UpdateCooldown = {}
 
 local RARITY_COLORS = {
     ["Common"] = Color3.fromRGB(200,200,200),
@@ -637,17 +639,58 @@ local RARITY_COLORS = {
 }
 
 local function registerItems(folder)
-    for _,tool in ipairs(folder:GetChildren()) do
-        WeaponDB[tool.Name] = {
-            Name = tool:GetAttribute("DisplayName") or tool.Name,
-            Rarity = tool:GetAttribute("RarityName") or "Common",
-            ImageId = tool:GetAttribute("ImageId") or "rbxassetid://7072725737"
-        }
+    for _, tool in ipairs(folder:GetChildren()) do
+        local handle = tool:FindFirstChild("Handle")
+        local key
+
+        if handle then
+            local mesh = handle:FindFirstChildOfClass("SpecialMesh")
+            if mesh then
+                key = mesh.MeshId .. (mesh.TextureId or "")
+            elseif handle:IsA("MeshPart") then
+                key = handle.MeshId .. (handle.TextureID or "")
+            end
+        end
+
+        if key then
+            WeaponDB[key] = {
+                Name = tool:GetAttribute("DisplayName") or tool.Name,
+                Rarity = tool:GetAttribute("RarityName") or "Common",
+                ImageId = tool:GetAttribute("ImageId") or "rbxassetid://7072725737"
+            }
+        else
+            WeaponDB[tool.Name] = {
+                Name = tool:GetAttribute("DisplayName") or tool.Name,
+                Rarity = tool:GetAttribute("RarityName") or "Common",
+                ImageId = tool:GetAttribute("ImageId") or "rbxassetid://7072725737"
+            }
+        end
     end
 end
 
+local function getMeshId(tool)
+    local handle = tool:FindFirstChild("Handle")
+    if not handle then return nil end
+
+    local mesh = handle:FindFirstChildOfClass("SpecialMesh")
+    if mesh then
+        return mesh.MeshId .. (mesh.TextureId or "")
+    end
+
+    if handle:IsA("MeshPart") then
+        return handle.MeshId .. (handle.TextureID or "")
+    end
+
+    return nil
+end
+
 local function getWeaponInfo(tool)
-    return WeaponDB[tool.Name]
+    local meshId = getMeshId(tool)
+    if meshId and WeaponDB[meshId] then
+        return WeaponDB[meshId]
+    elseif WeaponDB[tool.Name] then
+        return WeaponDB[tool.Name]
+    end
 end
 
 local function clearConnections(player)
@@ -660,28 +703,43 @@ local function clearConnections(player)
 end
 
 local function createBillboardForPlayer(player)
-    if not EspitemsEnabled or player == LocalPlayer then return end
+    if not EspitemsEnabled or player == LocalPlayer then
+        if BillboardCache[player] then
+            BillboardCache[player]:Destroy()
+            BillboardCache[player] = nil
+        end
+        return
+    end
+
     local char = player.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    if BillboardCache[player] then
-        BillboardCache[player]:Destroy()
-        BillboardCache[player] = nil
+    local billboard = BillboardCache[player]
+
+    if not billboard then
+        billboard = Instance.new("BillboardGui")
+        billboard.Adornee = hrp
+        billboard.Size = UDim2.new(0,200,0,25)
+        billboard.StudsOffset = Vector3.new(0,-5,0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = char
+
+        local layout = Instance.new("UIListLayout")
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.Padding = UDim.new(0,5)
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        layout.Parent = billboard
+
+        BillboardCache[player] = billboard
     end
 
-    local billboard = Instance.new("BillboardGui")
-    billboard.Adornee = hrp
-    billboard.Size = UDim2.new(0,200,0,25)
-    billboard.StudsOffset = Vector3.new(0,-5,0)
-    billboard.AlwaysOnTop = true
-    billboard.Parent = char
-
-    local layout = Instance.new("UIListLayout", billboard)
-    layout.FillDirection = Enum.FillDirection.Horizontal
-    layout.Padding = UDim.new(0,5)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    for _,v in ipairs(billboard:GetChildren()) do
+        if v:IsA("ImageLabel") then
+            v:Destroy()
+        end
+    end
 
     local tools = {}
 
@@ -705,33 +763,36 @@ local function createBillboardForPlayer(player)
     for _,tool in ipairs(tools) do
         local info = getWeaponInfo(tool)
 
-        local img = Instance.new("ImageLabel", billboard)
+        local img = Instance.new("ImageLabel")
         img.Size = UDim2.new(0,20,0,20)
         img.BackgroundTransparency = 0.1
         img.Image = info and info.ImageId or "rbxassetid://7072725737"
         img.BackgroundColor3 = Color3.fromRGB(240,248,255)
+        img.Parent = billboard
 
         Instance.new("UICorner", img).CornerRadius = UDim.new(0,10)
 
-        local stroke = Instance.new("UIStroke", img)
+        local stroke = Instance.new("UIStroke")
         stroke.Color = info and RARITY_COLORS[info.Rarity] or Color3.new(1,1,1)
         stroke.Thickness = 2
+        stroke.Parent = img
     end
+end
 
-    BillboardCache[player] = billboard
+local function requestUpdate(player)
+    if UpdateCooldown[player] then return end
+    UpdateCooldown[player] = true
+
+    task.delay(0.15, function()
+        UpdateCooldown[player] = nil
+        createBillboardForPlayer(player)
+    end)
 end
 
 local function hookInventory(player)
     clearConnections(player)
-
     local cons = {}
     Connections[player] = cons
-
-    local function update()
-        if EspitemsEnabled then
-            createBillboardForPlayer(player)
-        end
-    end
 
     local function hookChar(char)
         if BillboardCache[player] then
@@ -739,8 +800,8 @@ local function hookInventory(player)
             BillboardCache[player] = nil
         end
 
-        table.insert(cons, char.ChildAdded:Connect(update))
-        table.insert(cons, char.ChildRemoved:Connect(update))
+        table.insert(cons, char.ChildAdded:Connect(function() requestUpdate(player) end))
+        table.insert(cons, char.ChildRemoved:Connect(function() requestUpdate(player) end))
 
         local hum = char:FindFirstChildOfClass("Humanoid")
         if hum then
@@ -753,7 +814,7 @@ local function hookInventory(player)
         end
 
         task.wait(0.2)
-        update()
+        requestUpdate(player)
     end
 
     table.insert(cons, player.CharacterAdded:Connect(function(char)
@@ -767,15 +828,18 @@ local function hookInventory(player)
 
     local backpack = player:WaitForChild("Backpack",5)
     if backpack then
-        table.insert(cons, backpack.ChildAdded:Connect(update))
-        table.insert(cons, backpack.ChildRemoved:Connect(update))
+        table.insert(cons, backpack.ChildAdded:Connect(function() requestUpdate(player) end))
+        table.insert(cons, backpack.ChildRemoved:Connect(function() requestUpdate(player) end))
     end
 end
 
-local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
-if itemsFolder then
-    for _,cat in ipairs(itemsFolder:GetChildren()) do
-        registerItems(cat)
+for _, category in ipairs({"gun","melee","throwable","consumable","farming","misc","rod","fish"}) do
+    local folder = ReplicatedStorage:FindFirstChild("Items")
+    if folder then
+        local cat = folder:FindFirstChild(category)
+        if cat then
+            registerItems(cat)
+        end
     end
 end
 
@@ -1732,7 +1796,6 @@ EspTab:Toggle({
         end
     end
 })
-
 local ItemsESPToggle = EspTab:Toggle({
     Title = "Items Inventory ESP",
     Desc = "แสดงไอเท็มในกระเป๋าทุกคน",
@@ -1758,13 +1821,6 @@ local ItemsESPToggle = EspTab:Toggle({
                         createBillboardForPlayer(p)
                     end
                 end)
-
-                if p.Character then
-                    task.wait(0.3)
-                    if EspitemsEnabled then
-                        createBillboardForPlayer(p)
-                    end
-                end
             end)
 
         else
@@ -1785,6 +1841,7 @@ local ItemsESPToggle = EspTab:Toggle({
         end
     end
 })
+
 
 EspTab:Toggle({
     Title = "ESP Items Drop",
