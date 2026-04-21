@@ -1234,20 +1234,21 @@ end)
 
 
 
+
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local itemsFolder = ReplicatedStorage:WaitForChild("Items")
 local dropFolder = workspace:WaitForChild("DroppedItems")
 
-local Rarity_itemsdropColors = {
-	Common = Color3.fromRGB(200,200,200),
-	Uncommon = Color3.fromRGB(86,176,62),
-	Rare = Color3.fromRGB(0,162,255),
-	Epic = Color3.fromRGB(170,85,255),
-	Legendary = Color3.fromRGB(255,170,0),
-	Omega = Color3.fromRGB(255,75,255),
-	Money = Color3.fromRGB(0,255,0)
+local RarityColors = {
+    Common = Color3.fromRGB(200,200,200),
+    Uncommon = Color3.fromRGB(86,176,62),
+    Rare = Color3.fromRGB(0,162,255),
+    Epic = Color3.fromRGB(170,85,255),
+    Legendary = Color3.fromRGB(255,170,0),
+    Omega = Color3.fromRGB(255,75,255),
+    Money = Color3.fromRGB(0,255,0)
 }
 
 local ItemRarityDB = {}
@@ -1255,192 +1256,164 @@ local activeVisuals = {}
 local espEnabled = false
 local hiddenRarities = {}
 
-local categories = {
-	"gun","melee","throwable","consumable",
-	"farming","misc","rod","fish"
-}
+local categories = {"gun","melee","throwable","consumable","farming","misc","rod","fish"}
 
 local function registerItems(folder)
-	for _, item in ipairs(folder:GetChildren()) do
-		ItemRarityDB[item.Name] = item:GetAttribute("RarityName") or "Common"
-	end
+    for _, item in ipairs(folder:GetChildren()) do
+        ItemRarityDB[item.Name] = item:GetAttribute("RarityName") or "Common"
+    end
 end
 
 for _, category in ipairs(categories) do
-	local cat = itemsFolder:FindFirstChild(category)
-	if cat then
-		registerItems(cat)
-	end
+    local cat = itemsFolder:FindFirstChild(category)
+    if cat then registerItems(cat) end
 end
 
 local function getRarity(name)
-	if name == "Monney" then
-		return "Money"
-	end
-	return ItemRarityDB[name] or "Common"
+    if name == "Money" then return "Money" end
+    return ItemRarityDB[name] or "Common"
 end
 
 local function getColor(name, rarity)
-	if name == "Monney" then
-		return Color3.fromRGB(0,255,0)
-	end
-	return Rarity_itemsdropColors[rarity] or Color3.new(1,1,1)
+    if name == "Money" then return Color3.fromRGB(0,255,0) end
+    return RarityColors[rarity] or Color3.new(1,1,1)
 end
 
 local function shouldShowItem(item)
-	if not espEnabled then return false end
-	local rarity = getRarity(item.Name)
-	for _, hidden in ipairs(hiddenRarities) do
-		if rarity == hidden then
-			return false
-		end
-	end
-	return true
+    if not espEnabled then return false end
+    local rarity = getRarity(item.Name)
+    for _, hidden in ipairs(hiddenRarities) do
+        if rarity == hidden then return false end
+    end
+    return true
 end
 
 local function createVisual(item)
-	if activeVisuals[item] then return end
-	if not shouldShowItem(item) then return end
+    if activeVisuals[item] then return end
+    if not shouldShowItem(item) then return end
 
-	local part = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
-	if not part then return end
+    local part = item:FindFirstChild("Handle") or item:FindFirstChildWhichIsA("BasePart")
+    if not part then return end
 
-	local rarity = getRarity(item.Name)
-	local color = getColor(item.Name, rarity)
-	local amount = item:GetAttribute("Amount") or 1
+    local rarity = getRarity(item.Name)
+    local color = getColor(item.Name, rarity)
+    local amount = item:GetAttribute("Amount") or 1
 
-	local h = Instance.new("Highlight")
-	h.Adornee = item
-	h.FillTransparency = 0.3
-	h.OutlineTransparency = 0
-	h.FillColor = color
-	h.OutlineColor = color
-	h.Parent = item
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = item
+    highlight.FillTransparency = 0.3
+    highlight.OutlineTransparency = 0
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+    highlight.Parent = item
 
-	local light = Instance.new("PointLight")
-	light.Color = color
-	light.Range = 12
-	light.Brightness = 3
-	light.Shadows = true
-	light.Parent = part
+    local pointLight = Instance.new("PointLight")
+    pointLight.Color = color
+    pointLight.Range = 10
+    pointLight.Brightness = 2
+    pointLight.Parent = part
 
-	local att = Instance.new("Attachment")
-	att.Parent = part
-	
-	local spotLight = Instance.new("SpotLight")
-	spotLight.Color = color
-	spotLight.Range = 10
-	spotLight.Brightness = 2
-	spotLight.Angle = 90
-	spotLight.Face = Enum.NormalId.Top
-	spotLight.Parent = att
+    local billboard = Instance.new("BillboardGui")
+    billboard.Adornee = part
+    billboard.Size = UDim2.new(0, 140, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = item
 
-	local bb = Instance.new("BillboardGui")
-	bb.Adornee = part
-	bb.Size = UDim2.new(0, 140, 0, 40)
-	bb.StudsOffset = Vector3.new(0, 2.5, 0)
-	bb.AlwaysOnTop = true
-	bb.Parent = item
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1,0,0,22)
+    nameLabel.Position = UDim2.new(0,0,0,0)
+    nameLabel.TextScaled = false
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.TextSize = 14
+    nameLabel.TextColor3 = color
+    nameLabel.TextStrokeTransparency = 0.3
+    nameLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+    nameLabel.Text = "[" .. item.Name .. "] x" .. amount
+    nameLabel.Parent = billboard
 
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Size = UDim2.new(1,0,0,22)
-	nameLabel.Position = UDim2.new(0,0,0,0)
-	nameLabel.TextScaled = false
-	nameLabel.Font = Enum.Font.SourceSansBold
-	nameLabel.TextSize = 14
-	nameLabel.TextColor3 = color
-	nameLabel.TextStrokeTransparency = 0.3
-	nameLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
-	nameLabel.Text = "[" .. item.Name .. "] x" .. amount
-	nameLabel.Parent = bb
+    local distLabel = Instance.new("TextLabel")
+    distLabel.BackgroundTransparency = 1
+    distLabel.Size = UDim2.new(1,0,0,18)
+    distLabel.Position = UDim2.new(0,0,0,22)
+    distLabel.TextScaled = false
+    distLabel.Font = Enum.Font.SourceSans
+    distLabel.TextSize = 11
+    distLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    distLabel.TextStrokeTransparency = 0.5
+    distLabel.Text = "[0m]"
+    distLabel.Parent = billboard
 
-	local distLabel = Instance.new("TextLabel")
-	distLabel.BackgroundTransparency = 1
-	distLabel.Size = UDim2.new(1,0,0,18)
-	distLabel.Position = UDim2.new(0,0,0,22)
-	distLabel.TextScaled = false
-	distLabel.Font = Enum.Font.SourceSans
-	distLabel.TextSize = 11
-	distLabel.TextColor3 = Color3.fromRGB(255,255,255)
-	distLabel.TextStrokeTransparency = 0.5
-	distLabel.Text = "[0m]"
-	distLabel.Parent = bb
+    local player = game.Players.LocalPlayer
+    local updateConnection
+    if player and player.Character then
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            updateConnection = RunService.RenderStepped:Connect(function()
+                if not item or not item.Parent or not hrp or not hrp.Parent then
+                    if updateConnection then updateConnection:Disconnect() end
+                    return
+                end
+                local dist = (hrp.Position - part.Position).Magnitude
+                distLabel.Text = string.format("[%.1fm]", dist)
+            end)
+        end
+    end
 
-	local player = game.Players.LocalPlayer
-	local updateConnection
-	if player and player.Character then
-		local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			updateConnection = RunService.RenderStepped:Connect(function()
-				if not item or not item.Parent or not hrp or not hrp.Parent then
-					if updateConnection then updateConnection:Disconnect() end
-					return
-				end
-				local dist = (hrp.Position - part.Position).Magnitude
-				distLabel.Text = string.format("[%.1fm]", dist)
-			end)
-		end
-	end
-
-	activeVisuals[item] = {
-		Highlight = h,
-		PointLight = light,
-		SpotLight = spotLight,
-		Attachment = att,
-		Billboard = bb,
-		UpdateConnection = updateConnection,
-		NameLabel = nameLabel,
-		DistLabel = distLabel
-	}
+    activeVisuals[item] = {
+        Highlight = highlight,
+        PointLight = pointLight,
+        Billboard = billboard,
+        UpdateConnection = updateConnection
+    }
 end
 
 local function removeVisual(item)
-	local visuals = activeVisuals[item]
-	if visuals then
-		if visuals.UpdateConnection then
-			visuals.UpdateConnection:Disconnect()
-		end
-		if visuals.Highlight then visuals.Highlight:Destroy() end
-		if visuals.PointLight then visuals.PointLight:Destroy() end
-		if visuals.SpotLight then visuals.SpotLight:Destroy() end
-		if visuals.Attachment then visuals.Attachment:Destroy() end
-		if visuals.Billboard then visuals.Billboard:Destroy() end
-		activeVisuals[item] = nil
-	end
+    local visuals = activeVisuals[item]
+    if visuals then
+        if visuals.UpdateConnection then visuals.UpdateConnection:Disconnect() end
+        if visuals.Highlight then visuals.Highlight:Destroy() end
+        if visuals.PointLight then visuals.PointLight:Destroy() end
+        if visuals.Billboard then visuals.Billboard:Destroy() end
+        activeVisuals[item] = nil
+    end
 end
 
 local function removeAllVisuals()
-	for item, _ in pairs(activeVisuals) do
-		removeVisual(item)
-	end
-	activeVisuals = {}
+    for item, _ in pairs(activeVisuals) do
+        removeVisual(item)
+    end
+    activeVisuals = {}
 end
 
-local function updateAllESPVisibility()
-	removeAllVisuals()
-	if espEnabled then
-		for _, item in ipairs(dropFolder:GetChildren()) do
-			if shouldShowItem(item) then
-				createVisual(item)
-			end
-		end
-	end
+local function updateAllESP()
+    removeAllVisuals()
+    if espEnabled then
+        for _, item in ipairs(dropFolder:GetChildren()) do
+            if shouldShowItem(item) then
+                createVisual(item)
+            end
+        end
+    end
 end
 
 RunService.RenderStepped:Connect(function()
-	if espEnabled then
-		for _, item in ipairs(dropFolder:GetChildren()) do
-			if not activeVisuals[item] and shouldShowItem(item) then
-				createVisual(item)
-			elseif activeVisuals[item] and not shouldShowItem(item) then
-				removeVisual(item)
-			end
-		end
-	end
+    if espEnabled then
+        for _, item in ipairs(dropFolder:GetChildren()) do
+            if not activeVisuals[item] and shouldShowItem(item) then
+                createVisual(item)
+            elseif activeVisuals[item] and not shouldShowItem(item) then
+                removeVisual(item)
+            end
+        end
+    end
 end)
 
 dropFolder.ChildRemoved:Connect(removeVisual)
+
+
+
 
 
 
@@ -1814,27 +1787,28 @@ local ItemsESPToggle = EspTab:Toggle({
 })
 
 EspTab:Toggle({
-    Title = "ESP items drop",
-    Desc = "",
+    Title = "ESP Items Drop",
+    Desc = "แสดงไอเทมที่ตกพื้น",
     Default = false,
     Callback = function(state)
         espEnabled = state
-        updateAllESPVisibility()
+        updateAllESP()
     end
 })
 
 EspTab:Dropdown({
-    Title = "Hide Rarity",
-    Desc = "Select rarity to hide (show all if none selected)",
-    Values = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Omega", "Money" },
+    Title = "Hide Rarity items drop",
+    Desc = "เลือกระดับที่จะไม่แสดง สำหรับไอเท็มดรอบ",
+    Values = { "Money", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Omega" },
     Value = {},
     Multi = true,
     AllowNone = true,
     Callback = function(option)
         hiddenRarities = option
-        updateAllESPVisibility()
+        updateAllESP()
     end
 })
+
 
 
 
