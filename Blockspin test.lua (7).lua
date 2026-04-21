@@ -19,7 +19,6 @@ local Window = WindUI:CreateWindow({
     Author = "Author[ 009.exe ]",
     Folder = "DNN HUB",
     Size = UDim2.fromOffset(760, 540),
-    Theme = "Light",
 	Background = "rbxassetid://124339558110081",
     Transparent = true,
     Resizable = true,
