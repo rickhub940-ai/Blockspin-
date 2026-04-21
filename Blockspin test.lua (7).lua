@@ -115,223 +115,190 @@ end)
 -- Silent aim
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 
+local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
+local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
-local SilentAim = false
-local Tracer = false
-local ShowFOV = false
+local TargetHistory = {}
+
 local FOV = 200
-local HitPart = "Head"
-local Friends = {}
+local ShowFOV = false
 
-local PRED_NORMAL = 0.12
-local PRED_CAR = 0.15
-local VELOCITY_LIMIT = 250
+local fovCircle = Drawing.new("Circle")
+fovCircle.Radius = FOV
+fovCircle.Thickness = 1
+fovCircle.Filled = false
+fovCircle.Color = Color3.fromRGB(255,255,255)
+fovCircle.Visible = ShowFOV
 
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Color = Color3.new(1,1,1)
-FOVCircle.Thickness = 2
-FOVCircle.NumSides = 100
-FOVCircle.Filled = false
-FOVCircle.Visible = ShowFOV
+local tracer = Drawing.new("Line")
+tracer.Thickness = 2
+tracer.Color = Color3.fromRGB(255,0,0)
+tracer.Visible = false
 
-local CenterLine = Drawing.new("Line")
-CenterLine.Color = Color3.new(1,0,0)
-CenterLine.Thickness = 2
-CenterLine.Visible = false
+local shotIndex = 0
 
-local shotToggle = false
+local function RainbowColor(i)
+    return Color3.fromHSV((i % 10)/10,1,1)
+end
 
 local function CreateTracer(fromPos, toPos)
-    shotToggle = not shotToggle
+    shotIndex += 1
     local distance = (toPos - fromPos).Magnitude
-
     local part = Instance.new("Part")
-    part.Size = Vector3.new(0.25, 0.25, distance)
+    part.Size = Vector3.new(0.4, 0.4, distance)
     part.CFrame = CFrame.new(fromPos, toPos) * CFrame.new(0, 0, -distance/2)
     part.Anchored = true
     part.CanCollide = false
     part.Material = Enum.Material.Neon
-    part.Color = shotToggle and Color3.fromRGB(0,0,0) or Color3.fromRGB(255,255,255)
+    part.Color = RainbowColor(shotIndex)
     part.Parent = workspace
-
-    Debris:AddItem(part, 3)
+    Debris:AddItem(part, 2)
 end
 
-local function isShotgunWeapon()
-    local char = LocalPlayer.Character
-    if not char then return false end
-    
-    for _, t in ipairs(char:GetChildren()) do
-        if t:IsA("Tool") then
-            local ammoType = t:GetAttribute("AmmoType")
-            if ammoType == "shotgun" or ammoType == "shootgun" then
-                return true
-            end
-        end
-    end
-    return false
+local function GetDistanceStart(a, b)
+    return (a - b).Magnitude
 end
 
-local function getPart(char)
-    if HitPart == "Body" then
-        return char:FindFirstChild("HumanoidRootPart")
-    end
-    return char:FindFirstChild("Head")
+local function WorldToViewPoint(pos)
+    local vp, onScreen = Camera:WorldToViewportPoint(pos)
+    return vp, onScreen
 end
 
-local function getClosest()
-    local best,dist = nil,math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
+local function IsAlive(model)
+    local hum = model:FindFirstChildOfClass("Humanoid")
+    local root = model:FindFirstChild("HumanoidRootPart")
+    return hum and root and hum.Health > 0
+end
 
-    for _,plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and not Friends[plr.Name] and plr.Character then
-            local part = getPart(plr.Character)
-            if part then
-                local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
+local function IsBehindWall(startPos, endPos, ignore)
+    local ray = Ray.new(startPos, endPos - startPos)
+    local hit = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {})
+    return hit ~= nil
+end
+
+local function GetClosestTarget()
+    local closest = nil
+    local dist = math.huge
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer 
+        and v.Character 
+        and IsAlive(v.Character) 
+        and not v:GetAttribute("SilentAimIgnore") then
+
+            local root = v.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local pos, onScreen = WorldToViewPoint(root.Position)
                 if onScreen then
-                    local d = (Vector2.new(pos.X,pos.Y) - center).Magnitude
+                    local d = GetDistanceStart(
+                        Vector2.new(pos.X, pos.Y),
+                        Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                    )
                     if d < FOV and d < dist then
+                        closest = v.Character
                         dist = d
-                        best = plr
                     end
                 end
             end
         end
     end
-
-    return best
+    return closest
 end
-
-local function wallCheck(fromPos,toPos,char)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Blacklist
-    params.FilterDescendantsInstances = {LocalPlayer.Character,char}
-    params.IgnoreWater = true
-
-    return Workspace:Raycast(fromPos,toPos - fromPos,params) ~= nil
-end
-
-local function isInVehicle(char)
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum and hum.SeatPart then
-        return true
-    end
-    return false
-end
-
-local function getPred(hrp, char)
-    local speed = hrp.AssemblyLinearVelocity.Magnitude
-    
-    if isInVehicle(char) then
-        if speed > 100 then
-            return 0.05
-        else
-            return PRED_CAR
-        end
-    end
-    
-    if speed > VELOCITY_LIMIT then
-        return 0
-    elseif speed > 100 then
-        return 0.05
-    else
-        return PRED_NORMAL
-    end
-end
-
-local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Send")
-
-local old
-old = hookfunction(Remote.FireServer,function(self,...)
-    local args = {...}
-
-    -- เช็คว่าเป็นการยิงปืนจริงๆ เท่านั้น
-    local isShooting = args[2] == "shoot_gun" or args[2] == "shoot" or string.find(tostring(args[2]), "shoot")
-
-    if SilentAim and isShooting then
-        local target = getClosest()
-
-        if target and target.Character then
-            local part = getPart(target.Character)
-            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-            local myHead = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-
-            if part and hrp and myHead then
-                local pred = getPred(hrp, target.Character)
-                local predPos = part.Position + hrp.AssemblyLinearVelocity * pred
-
-                -- สร้างเอฟเฟคกระสุนเฉพาะตอนยิงเท่านั้น
-                CreateTracer(myHead.Position, predPos)
-
-                local isShotgun = isShotgunWeapon()
-                local myPos = myHead.Position
-
-                if isShotgun then
-                    args[4] = CFrame.new(myPos, predPos)
-                    args[5] = {
-                        [1] = {
-                            [1] = {
-                                Instance = part,
-                                Position = predPos
-                            }
-                        }
-                    }
-                else
-                    if wallCheck(myPos, predPos, target.Character) then
-                        args[4] = CFrame.new(math.huge, math.huge, math.huge)
-                    else
-                        args[4] = CFrame.new(myPos, predPos)
-                    end
-                    args[5] = {
-                        [1] = {
-                            [1] = {
-                                Instance = part,
-                                Position = predPos
-                            }
-                        }
-                    }
-                end
-            end
-        end
-    end
-
-    return old(self, unpack(args))
-end)
 
 RunService.RenderStepped:Connect(function()
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    fovCircle.Visible = ShowFOV
+    fovCircle.Radius = FOV
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 
-    FOVCircle.Visible = ShowFOV and SilentAim
-    FOVCircle.Position = center
-    FOVCircle.Radius = FOV
-
-    CenterLine.Visible = false
-
-    if Tracer then
-        local target = getClosest()
-        if target and target.Character then
-            local part = getPart(target.Character)
-            if part then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    CenterLine.From = center
-                    CenterLine.To = Vector2.new(pos.X, pos.Y)
-                    CenterLine.Visible = true
-                end
-            end
+    local target = GetClosestTarget()
+    if target and target:FindFirstChild("Head") then
+        local pos, onScreen = WorldToViewPoint(target.Head.Position)
+        if onScreen then
+            tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            tracer.To = Vector2.new(pos.X, pos.Y)
+            tracer.Visible = true
+        else
+            tracer.Visible = false
         end
+    else
+        tracer.Visible = false
     end
 end)
 
+local function GetVelocity(target, pos)
+    local t = tick()
+    TargetHistory[target] = TargetHistory[target] or {}
+    local hist = TargetHistory[target]
+    if #hist >= 3 then table.remove(hist, 1) end
+    table.insert(hist, {pos = pos, time = t})
+    if #hist < 2 then return Vector3.zero end
+    local p1 = hist[#hist - 1]
+    local p2 = hist[#hist]
+    local dt = math.max(p2.time - p1.time, 1e-6)
+    return (p2.pos - p1.pos) / dt
+end
 
+local OldSend
+OldSend = hookfunction(Network.send, function(...)
+    local args = {...}
+    if args[1] == "shoot_gun" then
+        local target = GetClosestTarget()
+        if target then
+            local part = target:FindFirstChild("Head")
+            if part then
+                local char = LocalPlayer.Character
+                if not char then return OldSend(...) end
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if not root then return OldSend(...) end
+
+                local myPos = root.Position
+                local targetPos = part.Position
+                local vel = GetVelocity(target, targetPos)
+                local speed = vel.Magnitude
+
+                local predictedPos
+                local lookDir = part.CFrame.LookVector
+                local scaled = math.clamp(speed, 0, 125) / 125
+
+                if speed > 126 then
+                    predictedPos = targetPos
+                else
+                    local maxLead = 15
+                    local leadDistance = scaled * maxLead
+                    predictedPos = targetPos + (lookDir * leadDistance)
+                    if vel.Y > 2 then
+                        predictedPos = predictedPos + Vector3.new(0, 3 + scaled*3, 0)
+                    elseif vel.Y < -2 then
+                        predictedPos = predictedPos - Vector3.new(0, 1.5 + scaled*2, 0)
+                    end
+                end
+
+                local ignore = {LocalPlayer.Character, target}
+                local behind = IsBehindWall(myPos, predictedPos, ignore)
+
+                if behind then
+                    args[3] = CFrame.new(math.huge, math.huge, math.huge)
+                else
+                    args[3] = CFrame.new(myPos, predictedPos)
+                end
+
+                for _, v in pairs(args[4] or {}) do
+                    for _, x in pairs(v) do
+                        x.Position = predictedPos
+                        x.Instance = part
+                    end
+                end
+
+                CreateTracer(myPos, predictedPos)
+            end
+        end
+    end
+    return OldSend(table.unpack(args))
+end)
 
 
 
@@ -1458,68 +1425,51 @@ local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
 CombatTab:Toggle({
-    Title = "Silent Aim",
-    Default = true,
-    Callback = function(v)
-        SilentAim = v
-    end
-})
-
-
-CombatTab:Toggle({
     Title = "Show FOV",
-    Default = false,
+    Default = ShowFOV,
     Callback = function(v)
         ShowFOV = v
     end
 })
 
-
-CombatTab:Toggle({
-    Title = "Show Tracer",
-    Default = true,
-    Callback = function(v)
-        Tracer = v
-    end
-})
-
-
 CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
-    Value = {Min = 20, Max = 500},
-    Default = 150,
+    Value = {
+        Min = 50,
+        Max = 500,
+        Default = FOV
+    },
     Callback = function(v)
         FOV = v
-        if FOVCircle then FOVCircle.Radius = v end
     end
 })
 
-
-CombatTab:Dropdown({
-    Title = "Hit Part",
-    Values = {"Head", "Body"},
-    Default = "Head",
-    Callback = function(v)
-        HitPart = v
+local function GetPlayerNames()
+    local t = {}
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(t, plr.Name)
+        end
     end
-})
-
+    return t
+end
 
 CombatTab:Dropdown({
     Title = "Save Friend",
+    Values = GetPlayerNames(),
     Multi = true,
-    Values = (function()
-        local t = {}
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then table.insert(t, p.Name) end
+    Default = {},
+    Callback = function(selected)
+        for _, plr in pairs(Players:GetPlayers()) do
+            plr:SetAttribute("SilentAimIgnore", false)
         end
-        return t
-    end)(),
-    Callback = function(list)
-        Friends = {}
-        for _, name in pairs(list) do
-            Friends[name] = true
+
+        for _, name in pairs(selected) do
+            local plr = Players:FindFirstChild(name)
+            if plr then
+                plr:SetAttribute("SilentAimIgnore", true)
+            end
         end
     end
 })
