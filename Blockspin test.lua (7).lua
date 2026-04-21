@@ -14,14 +14,14 @@ local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
 ..player.UserId.."&size=420x420&format=Png"
 
 local Window = WindUI:CreateWindow({
-    Title = "Dipper HUB [ BLOCK SPIN] ",
-    Icon = "rbxassetid://124339558110081",
-    Author = "Author[ 009.exe ]",
-    Folder = "DNN HUB",
-    Size = UDim2.fromOffset(760, 540),
-	Background = "rbxassetid://124339558110081",
+    Title = "Dipper HUB | Premium [ BLOCK SPIN] ",
+    Author = "Dipper TEAM",
+    Folder = "N HUB",
+    Size = UDim2.fromOffset(700, 540),
+    Background = "rbxassetid://105861983128679",
     Transparent = true,
     Resizable = true,
+
 
     User = {
         Enabled = true,
