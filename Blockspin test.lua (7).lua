@@ -1917,12 +1917,21 @@ local AntiKillToggle = ChaterTab:Toggle({
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local function toggleName(state)
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        local nameDisplay = playerGui:FindFirstChild("NameDisplay")
-        if nameDisplay then
-            nameDisplay.Enabled = not state
+local hideNameEnabled = false
+
+local function HideName()
+    if not hideNameEnabled then return end
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local gui = hrp:FindFirstChild("CharacterBillboardGui")
+        if gui then
+            local nameLabel = gui:FindFirstChild("PlayerName")
+            if nameLabel and nameLabel:IsA("TextLabel") then
+                nameLabel.Visible = false
+            end
         end
     end
 end
@@ -1933,9 +1942,19 @@ ChaterTab:Toggle({
 	Desc = "ปิดชื่อ(ปิดแค่เราคนเดียวคนอื่นเห็นเหมือนเดิม)",
     Default = false,
     Callback = function(state)
-        toggleName(state)
+        hideNameEnabled = state
+        if state then
+            HideName()
+        end
     end
 })
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+    task.wait(0.5)
+    if hideNameEnabled then
+        HideName()
+    end
+end)
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
 local pick
