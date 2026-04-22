@@ -123,15 +123,16 @@ local LocalPlayer = Players.LocalPlayer
 
 local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
-
+-- SETTINGS
 local FOV = 200
-local ShowFOV = false
-local SilentAimEnabled = false
+local ShowFOV = true
+local SilentAimEnabled = true
 local AimPart = "Head"
 
 local TargetHistory = {}
+local shotIndex = 0
 
-
+-- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
@@ -139,18 +140,18 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.fromRGB(255,255,255)
 fovCircle.Visible = ShowFOV
 
-
+-- Tracer
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
 tracer.Color = Color3.fromRGB(255,0,0)
 tracer.Visible = false
 
-
+-- Billboard (ไม่หมุน)
 local billboard = Instance.new("BillboardGui")
-billboard.Size = UDim2.new(0,35,0,35)
+billboard.Size = UDim2.new(0,40,0,40)
 billboard.AlwaysOnTop = true
 billboard.MaxDistance = math.huge
-billboard.StudsOffset = Vector3.new(0, 0, 0)
+billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 billboard.Enabled = false
 billboard.Parent = game.CoreGui
 
@@ -164,11 +165,10 @@ img.Image = "rbxassetid://139464476852547"
 img.Parent = billboard
 
 local currentTarget = nil
-local shotIndex = 0
 
-
+-- UTILITY FUNCTIONS
 local function RainbowColor(i)
-    return Color3.fromHSV((i % 10)/10,1,1)
+    return Color3.fromHSV((i % 10)/10, 1, 1)
 end
 
 local function CreateTracer(fromPos, toPos)
@@ -203,6 +203,8 @@ local function GetVelocity(target, pos)
     local dt = math.max(p2.time - p1.time, 1e-6)
     return (p2.pos - p1.pos) / dt
 end
+
+-- GET TARGET
 local function GetClosestTarget()
     local closest = nil
     local dist = math.huge
@@ -229,10 +231,13 @@ local function GetClosestTarget()
     return closest
 end
 
+-- MAIN VISUAL LOOP
 RunService.RenderStepped:Connect(function()
-    fovCircle.Visible = ShowFOV
+    -- อัพเดท FOV Circle
+    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    fovCircle.Position = centerPos
     fovCircle.Radius = FOV
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    fovCircle.Visible = ShowFOV
     
     if not SilentAimEnabled then
         tracer.Visible = false
@@ -241,7 +246,6 @@ RunService.RenderStepped:Connect(function()
         return
     end
     
-    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     local target = GetClosestTarget()
     
     if target then
@@ -272,6 +276,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- HOOK NETWORK (SILENT AIM)
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = {...}
@@ -290,6 +295,7 @@ OldSend = hookfunction(Network.send, function(...)
                 local vel = GetVelocity(target, targetPos)
                 local speed = vel.Magnitude
                 
+                -- Prediction
                 local predictedPos
                 local lookDir = part.CFrame.LookVector
                 local scaled = math.clamp(speed, 0, 125) / 125
@@ -1532,19 +1538,20 @@ end)
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
+
+
+CombatTab:Toggle({
+    Title = "Silent Aim",
+    Default = SilentAimEnabled,
+    Callback = function(v)
+        SilentAimEnabled = v
+    end
+})
 CombatTab:Toggle({
     Title = "Show FOV",
     Default = ShowFOV,
     Callback = function(v)
         ShowFOV = v
-    end
-})
-
-CombatTab:Toggle({
-    Title = "Silent Aim",
-    Default = false,
-    Callback = function(v)
-        SilentAimEnabled = v
     end
 })
 
@@ -1582,7 +1589,7 @@ local function GetPlayerNames()
 end
 
 CombatTab:Dropdown({
-    Title = "Save Friend",
+    Title = "Save Friend (Ignore)",
     Values = GetPlayerNames(),
     Multi = true,
     Default = {},
@@ -1599,6 +1606,8 @@ CombatTab:Dropdown({
         end
     end
 })
+
+
 
 
 
