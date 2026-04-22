@@ -113,7 +113,6 @@ end)
 -- Silent aim
 
 
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
@@ -123,16 +122,14 @@ local LocalPlayer = Players.LocalPlayer
 
 local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
--- SETTINGS
 local FOV = 200
-local ShowFOV = true
-local SilentAimEnabled = true
+local ShowFOV = false
+local SilentAimEnabled = false
 local AimPart = "Head"
 
 local TargetHistory = {}
 local shotIndex = 0
 
--- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
@@ -140,13 +137,11 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.fromRGB(255,255,255)
 fovCircle.Visible = ShowFOV
 
--- Tracer
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
 tracer.Color = Color3.fromRGB(255,0,0)
 tracer.Visible = false
 
--- Billboard (ไม่หมุน)
 local billboard = Instance.new("BillboardGui")
 billboard.Size = UDim2.new(0,40,0,40)
 billboard.AlwaysOnTop = true
@@ -161,12 +156,11 @@ img.BackgroundTransparency = 1
 img.ScaleType = Enum.ScaleType.Fit
 img.AnchorPoint = Vector2.new(0.5, 0.5)
 img.Position = UDim2.new(0.5, 0, 0.5, 0)
-img.Image = "rbxassetid://139464476852547"
+img.Image = "rbxassetid://13811079885"
 img.Parent = billboard
 
 local currentTarget = nil
 
--- UTILITY FUNCTIONS
 local function RainbowColor(i)
     return Color3.fromHSV((i % 10)/10, 1, 1)
 end
@@ -193,7 +187,9 @@ end
 
 local function GetVelocity(target, pos)
     local t = tick()
-    TargetHistory[target] = TargetHistory[target] or {}
+    if not TargetHistory[target] then
+        TargetHistory[target] = {}
+    end
     local hist = TargetHistory[target]
     if #hist >= 3 then table.remove(hist, 1) end
     table.insert(hist, {pos = pos, time = t})
@@ -204,38 +200,51 @@ local function GetVelocity(target, pos)
     return (p2.pos - p1.pos) / dt
 end
 
--- GET TARGET
 local function GetClosestTarget()
+    if not Camera or not Camera.ViewportSize then
+        return nil
+    end
+    
     local closest = nil
-    local dist = math.huge
-    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character then
-            local part = v.Character:FindFirstChild(AimPart)
-            local hum = v.Character:FindFirstChildOfClass("Humanoid")
+    local closestDist = FOV + 1
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local isFriend = false
+            pcall(function()
+                isFriend = player:GetAttribute("SilentAimIgnore") == true
+            end)
+            if isFriend then goto continue end
             
-            if part and hum and hum.Health > 0 and not v:GetAttribute("SilentAimIgnore") then
-                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            local targetPart = player.Character:FindFirstChild(AimPart)
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            
+            if targetPart and humanoid and humanoid.Health > 0 then
+                local vector, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+                
                 if onScreen then
-                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if d < FOV and d < dist then
-                        closest = v.Character
-                        dist = d
+                    local distance = (Vector2.new(vector.X, vector.Y) - center).Magnitude
+                    
+                    if distance < closestDist then
+                        closest = player.Character
+                        closestDist = distance
                     end
                 end
             end
         end
+        ::continue::
     end
     
     return closest
 end
 
--- MAIN VISUAL LOOP
 RunService.RenderStepped:Connect(function()
-    -- อัพเดท FOV Circle
-    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-    fovCircle.Position = centerPos
+    if not Camera or not Camera.ViewportSize then return end
+    
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    
+    fovCircle.Position = center
     fovCircle.Radius = FOV
     fovCircle.Visible = ShowFOV
     
@@ -251,12 +260,11 @@ RunService.RenderStepped:Connect(function()
     if target then
         local part = target:FindFirstChild(AimPart)
         if part then
-            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
-            local targetPos2D = Vector2.new(pos.X, pos.Y)
+            local vector, onScreen = Camera:WorldToViewportPoint(part.Position)
             
             if onScreen then
-                tracer.From = centerPos
-                tracer.To = targetPos2D
+                tracer.From = center
+                tracer.To = Vector2.new(vector.X, vector.Y)
                 tracer.Visible = true
                 
                 if currentTarget ~= part then
@@ -276,7 +284,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- HOOK NETWORK (SILENT AIM)
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = {...}
@@ -295,7 +302,6 @@ OldSend = hookfunction(Network.send, function(...)
                 local vel = GetVelocity(target, targetPos)
                 local speed = vel.Magnitude
                 
-                -- Prediction
                 local predictedPos
                 local lookDir = part.CFrame.LookVector
                 local scaled = math.clamp(speed, 0, 125) / 125
@@ -335,6 +341,7 @@ OldSend = hookfunction(Network.send, function(...)
     end
     return OldSend(table.unpack(args))
 end)
+
 
 
 
@@ -1540,6 +1547,8 @@ local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
 
+
+
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = SilentAimEnabled,
@@ -1554,7 +1563,6 @@ CombatTab:Toggle({
         ShowFOV = v
     end
 })
-
 CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
@@ -1589,7 +1597,7 @@ local function GetPlayerNames()
 end
 
 CombatTab:Dropdown({
-    Title = "Save Friend (Ignore)",
+    Title = "Save Friend",
     Values = GetPlayerNames(),
     Multi = true,
     Default = {},
