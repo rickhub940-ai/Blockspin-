@@ -112,6 +112,8 @@ end)
 
 -- Silent aim
 
+
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
@@ -121,10 +123,14 @@ local LocalPlayer = Players.LocalPlayer
 
 local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
-local TargetHistory = {}
 
 local FOV = 200
 local ShowFOV = false
+local SilentAimEnabled = false
+local AimPart = "Head"
+
+local TargetHistory = {}
+
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
@@ -133,19 +139,40 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.fromRGB(255,255,255)
 fovCircle.Visible = ShowFOV
 
+
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
 tracer.Color = Color3.fromRGB(255,0,0)
 tracer.Visible = false
 
+
+local billboard = Instance.new("BillboardGui")
+billboard.Size = UDim2.new(0,35,0,35)
+billboard.AlwaysOnTop = true
+billboard.MaxDistance = math.huge
+billboard.StudsOffset = Vector3.new(0, 0, 0)
+billboard.Enabled = false
+billboard.Parent = game.CoreGui
+
+local img = Instance.new("ImageLabel")
+img.Size = UDim2.new(1,0,1,0)
+img.BackgroundTransparency = 1
+img.ScaleType = Enum.ScaleType.Fit
+img.AnchorPoint = Vector2.new(0.5, 0.5)
+img.Position = UDim2.new(0.5, 0, 0.5, 0)
+img.Image = "rbxassetid://139464476852547"
+img.Parent = billboard
+
+local currentTarget = nil
 local shotIndex = 0
+
 
 local function RainbowColor(i)
     return Color3.fromHSV((i % 10)/10,1,1)
 end
 
 local function CreateTracer(fromPos, toPos)
-    shotIndex += 1
+    shotIndex = shotIndex + 1
     local distance = (toPos - fromPos).Magnitude
     local part = Instance.new("Part")
     part.Size = Vector3.new(0.4, 0.4, distance)
@@ -158,74 +185,11 @@ local function CreateTracer(fromPos, toPos)
     Debris:AddItem(part, 2)
 end
 
-local function GetDistanceStart(a, b)
-    return (a - b).Magnitude
-end
-
-local function WorldToViewPoint(pos)
-    local vp, onScreen = Camera:WorldToViewportPoint(pos)
-    return vp, onScreen
-end
-
-local function IsAlive(model)
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    local root = model:FindFirstChild("HumanoidRootPart")
-    return hum and root and hum.Health > 0
-end
-
 local function IsBehindWall(startPos, endPos, ignore)
     local ray = Ray.new(startPos, endPos - startPos)
     local hit = workspace:FindPartOnRayWithIgnoreList(ray, ignore or {})
     return hit ~= nil
 end
-
-local function GetClosestTarget()
-    local closest = nil
-    local dist = math.huge
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer 
-        and v.Character 
-        and IsAlive(v.Character) 
-        and not v:GetAttribute("SilentAimIgnore") then
-
-            local root = v.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local pos, onScreen = WorldToViewPoint(root.Position)
-                if onScreen then
-                    local d = GetDistanceStart(
-                        Vector2.new(pos.X, pos.Y),
-                        Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                    )
-                    if d < FOV and d < dist then
-                        closest = v.Character
-                        dist = d
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-RunService.RenderStepped:Connect(function()
-    fovCircle.Visible = ShowFOV
-    fovCircle.Radius = FOV
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-
-    local target = GetClosestTarget()
-    if target and target:FindFirstChild("Head") then
-        local pos, onScreen = WorldToViewPoint(target.Head.Position)
-        if onScreen then
-            tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            tracer.To = Vector2.new(pos.X, pos.Y)
-            tracer.Visible = true
-        else
-            tracer.Visible = false
-        end
-    else
-        tracer.Visible = false
-    end
-end)
 
 local function GetVelocity(target, pos)
     local t = tick()
@@ -239,29 +203,97 @@ local function GetVelocity(target, pos)
     local dt = math.max(p2.time - p1.time, 1e-6)
     return (p2.pos - p1.pos) / dt
 end
+local function GetClosestTarget()
+    local closest = nil
+    local dist = math.huge
+    local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character then
+            local part = v.Character:FindFirstChild(AimPart)
+            local hum = v.Character:FindFirstChildOfClass("Humanoid")
+            
+            if part and hum and hum.Health > 0 and not v:GetAttribute("SilentAimIgnore") then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if d < FOV and d < dist then
+                        closest = v.Character
+                        dist = d
+                    end
+                end
+            end
+        end
+    end
+    
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    fovCircle.Visible = ShowFOV
+    fovCircle.Radius = FOV
+    fovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    
+    if not SilentAimEnabled then
+        tracer.Visible = false
+        billboard.Enabled = false
+        currentTarget = nil
+        return
+    end
+    
+    local centerPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    local target = GetClosestTarget()
+    
+    if target then
+        local part = target:FindFirstChild(AimPart)
+        if part then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            local targetPos2D = Vector2.new(pos.X, pos.Y)
+            
+            if onScreen then
+                tracer.From = centerPos
+                tracer.To = targetPos2D
+                tracer.Visible = true
+                
+                if currentTarget ~= part then
+                    currentTarget = part
+                    billboard.Adornee = part
+                    billboard.Enabled = true
+                end
+            else
+                tracer.Visible = false
+                billboard.Enabled = false
+            end
+        end
+    else
+        tracer.Visible = false
+        billboard.Enabled = false
+        currentTarget = nil
+    end
+end)
 
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = {...}
-    if args[1] == "shoot_gun" then
+    if args[1] == "shoot_gun" and SilentAimEnabled then
         local target = GetClosestTarget()
         if target then
-            local part = target:FindFirstChild("Head")
+            local part = target:FindFirstChild(AimPart)
             if part then
                 local char = LocalPlayer.Character
                 if not char then return OldSend(...) end
                 local root = char:FindFirstChild("HumanoidRootPart")
                 if not root then return OldSend(...) end
-
+                
                 local myPos = root.Position
                 local targetPos = part.Position
                 local vel = GetVelocity(target, targetPos)
                 local speed = vel.Magnitude
-
+                
                 local predictedPos
                 local lookDir = part.CFrame.LookVector
                 local scaled = math.clamp(speed, 0, 125) / 125
-
+                
                 if speed > 126 then
                     predictedPos = targetPos
                 else
@@ -274,30 +306,29 @@ OldSend = hookfunction(Network.send, function(...)
                         predictedPos = predictedPos - Vector3.new(0, 1.5 + scaled*2, 0)
                     end
                 end
-
+                
                 local ignore = {LocalPlayer.Character, target}
                 local behind = IsBehindWall(myPos, predictedPos, ignore)
-
+                
                 if behind then
                     args[3] = CFrame.new(math.huge, math.huge, math.huge)
                 else
                     args[3] = CFrame.new(myPos, predictedPos)
                 end
-
+                
                 for _, v in pairs(args[4] or {}) do
                     for _, x in pairs(v) do
                         x.Position = predictedPos
                         x.Instance = part
                     end
                 end
-
+                
                 CreateTracer(myPos, predictedPos)
             end
         end
     end
     return OldSend(table.unpack(args))
 end)
-
 
 
 
@@ -1509,6 +1540,14 @@ CombatTab:Toggle({
     end
 })
 
+CombatTab:Toggle({
+    Title = "Silent Aim",
+    Default = false,
+    Callback = function(v)
+        SilentAimEnabled = v
+    end
+})
+
 CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
@@ -1519,6 +1558,16 @@ CombatTab:Slider({
     },
     Callback = function(v)
         FOV = v
+    end
+})
+
+CombatTab:Dropdown({
+    Title = "Aim Part",
+    Values = {"Head", "HumanoidRootPart"},
+    Multi = false,
+    Default = "Head",
+    Callback = function(v)
+        AimPart = v
     end
 })
 
@@ -1541,7 +1590,7 @@ CombatTab:Dropdown({
         for _, plr in pairs(Players:GetPlayers()) do
             plr:SetAttribute("SilentAimIgnore", false)
         end
-
+        
         for _, name in pairs(selected) do
             local plr = Players:FindFirstChild(name)
             if plr then
@@ -1551,8 +1600,6 @@ CombatTab:Dropdown({
     end
 })
 
-CombatTab:Divider()
-CombatTab:Section({Title = "Attack"})
 
 
 
