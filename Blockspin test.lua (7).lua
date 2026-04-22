@@ -1032,6 +1032,82 @@ end)
 
 -- Anti kill
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+local CharModule = require(game.ReplicatedStorage.Modules.Core.Char)
+
+
+local enabled = false
+local flickering = false
+local undergroundBaseCFrame = nil
+local DROP_DEPTH = -55
+local MOVE_RADIUS = 10
+local FLICKER_RATE = 0.1
+
+local function isDowned()
+    local hum = CharModule.get_hum()
+    return hum and (hum:GetAttribute("HasBeenDowned") or hum:GetAttribute("IsDead") or hum.Health <= 0)
+end
+
+local function getHRP()
+    local char = CharModule.current_char.get()
+    if not char then return end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function teleportUnderground()
+    local hrp = getHRP()
+    if not hrp then return end
+    local original = hrp.CFrame
+    undergroundBaseCFrame = original + Vector3.new(0, DROP_DEPTH, 0)
+    hrp.CFrame = undergroundBaseCFrame
+end
+
+local function flickerAndMove()
+    if flickering then return end
+    flickering = true
+    task.spawn(function()
+        while flickering and enabled and isDowned() do
+            local hrp = getHRP()
+            if hrp and undergroundBaseCFrame then
+                local angle = math.random() * math.pi * 2
+                local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * MOVE_RADIUS
+                local randomPos = undergroundBaseCFrame.Position + offset
+                hrp.CFrame = CFrame.new(randomPos)
+                task.wait(0.05)
+                hrp.CFrame = undergroundBaseCFrame
+            end
+            task.wait(FLICKER_RATE)
+        end
+        flickering = false
+    end)
+end
+
+RunService.Heartbeat:Connect(function()
+    if not enabled then return end
+    if isDowned() then
+        local hrp = getHRP()
+        if hrp and not undergroundBaseCFrame then
+            teleportUnderground()
+        end
+        flickerAndMove()
+    else
+        if undergroundBaseCFrame then
+            local hrp = getHRP()
+            if hrp then
+                hrp.CFrame = undergroundBaseCFrame + Vector3.new(0, -DROP_DEPTH, 0)
+            end
+        end
+        undergroundBaseCFrame = nil
+        flickering = false
+    end
+end)
+
 
 
 -- Esp items drop
@@ -1804,6 +1880,30 @@ ChaterTab:Divider()
 
 ChaterTab:Section({Title = "Mod"})
 
+local AntiKillToggle = ChaterTab:Toggle({
+    Title = "Anti Kill",
+    Default = false,
+    Callback = function(state)
+        enabled = state
+        if state then
+            if WindUI then
+                WindUI:Notify({
+                    Title = "🛡️ Anti Kill Enabled",
+                    Description = "",
+                    Duration = 3
+                })
+            end
+        else
+            if WindUI then
+                WindUI:Notify({
+                    Title = "❌ Anti Kill Disabled",
+                    Description = "",
+                    Duration = 3
+                })
+            end
+        end
+    end
+})
 
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
