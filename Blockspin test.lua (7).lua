@@ -122,14 +122,16 @@ local LocalPlayer = Players.LocalPlayer
 
 local Network = require(game.ReplicatedStorage.Modules.Core.Net)
 
+-- SETTINGS
 local FOV = 200
 local ShowFOV = false
 local SilentAimEnabled = false
-local AimPart = "Head"
+local AimPart = "Head"  -- ค่าเริ่มต้น Head
 
 local TargetHistory = {}
 local shotIndex = 0
 
+-- FOV Circle
 local fovCircle = Drawing.new("Circle")
 fovCircle.Radius = FOV
 fovCircle.Thickness = 1
@@ -137,11 +139,13 @@ fovCircle.Filled = false
 fovCircle.Color = Color3.fromRGB(255,255,255)
 fovCircle.Visible = ShowFOV
 
+-- Tracer
 local tracer = Drawing.new("Line")
 tracer.Thickness = 2
 tracer.Color = Color3.fromRGB(255,0,0)
 tracer.Visible = false
 
+-- Billboard
 local billboard = Instance.new("BillboardGui")
 billboard.Size = UDim2.new(0,40,0,40)
 billboard.AlwaysOnTop = true
@@ -200,6 +204,7 @@ local function GetVelocity(target, pos)
     return (p2.pos - p1.pos) / dt
 end
 
+-- หาเป้าที่ใกล้ที่สุด (ใช้ AimPart ปัจจุบัน)
 local function GetClosestTarget()
     if not Camera or not Camera.ViewportSize then
         return nil
@@ -211,12 +216,14 @@ local function GetClosestTarget()
     
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
+            -- เช็คเพื่อน
             local isFriend = false
             pcall(function()
                 isFriend = player:GetAttribute("SilentAimIgnore") == true
             end)
             if isFriend then goto continue end
             
+            -- ใช้ AimPart ที่เลือก
             local targetPart = player.Character:FindFirstChild(AimPart)
             local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             
@@ -239,6 +246,7 @@ local function GetClosestTarget()
     return closest
 end
 
+-- Main Visual Loop
 RunService.RenderStepped:Connect(function()
     if not Camera or not Camera.ViewportSize then return end
     
@@ -284,6 +292,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- Hook Network (Silent Aim)
 local OldSend
 OldSend = hookfunction(Network.send, function(...)
     local args = {...}
@@ -341,6 +350,13 @@ OldSend = hookfunction(Network.send, function(...)
     end
     return OldSend(table.unpack(args))
 end)
+
+-- ============ UI ============
+
+
+
+
+
 
 
 
@@ -1546,8 +1562,13 @@ local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 
 
-
-
+CombatTab:Toggle({
+    Title = "Show FOV",
+    Default = ShowFOV,
+    Callback = function(v)
+        ShowFOV = v
+    end
+})
 
 CombatTab:Toggle({
     Title = "Silent Aim",
@@ -1556,13 +1577,7 @@ CombatTab:Toggle({
         SilentAimEnabled = v
     end
 })
-CombatTab:Toggle({
-    Title = "Show FOV",
-    Default = ShowFOV,
-    Callback = function(v)
-        ShowFOV = v
-    end
-})
+
 CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
@@ -1576,6 +1591,7 @@ CombatTab:Slider({
     end
 })
 
+-- ✅ แก้ไขให้เลือก AimPart ได้แล้ว
 CombatTab:Dropdown({
     Title = "Aim Part",
     Values = {"Head", "HumanoidRootPart"},
@@ -1583,9 +1599,11 @@ CombatTab:Dropdown({
     Default = "Head",
     Callback = function(v)
         AimPart = v
+        print("✅ เปลี่ยน AimPart เป็น: " .. v)  -- เช็คว่าเปลี่ยนจริง
     end
 })
 
+-- Friend List
 local function GetPlayerNames()
     local t = {}
     for _, plr in pairs(Players:GetPlayers()) do
@@ -1597,7 +1615,7 @@ local function GetPlayerNames()
 end
 
 CombatTab:Dropdown({
-    Title = "Save Friend",
+    Title = "Save Friend (Ignore)",
     Values = GetPlayerNames(),
     Multi = true,
     Default = {},
@@ -1614,6 +1632,9 @@ CombatTab:Dropdown({
         end
     end
 })
+
+
+
 
 
 
