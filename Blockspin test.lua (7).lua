@@ -1027,6 +1027,123 @@ end)
 
 
 
+-- hitaura
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Remote = Remotes:WaitForChild("Send")
+
+local hookEnabled = false
+local scanInterval = 1
+local scanRadius = 12
+local running = false
+local localEventCounter = 0
+local localFuncCounter = 0
+
+local function SafeCall(f, ...)
+    local ok, res = pcall(f, ...)
+    return ok, res
+end
+
+local function CallRemote(remote, ...)
+    if not remote then return end
+    if remote.ClassName == "RemoteEvent" then
+        localEventCounter = localEventCounter + 1
+        SafeCall(function(...) remote:FireServer(localEventCounter, ...) end, ...)
+    elseif remote.ClassName == "RemoteFunction" then
+        localFuncCounter = localFuncCounter + 1
+        SafeCall(function(...) remote:InvokeServer(localFuncCounter, ...) end, ...)
+    else
+        SafeCall(function(...)
+            if remote.FireServer then remote:FireServer(...)
+            elseif remote.InvokeServer then remote:InvokeServer(...) end
+        end, ...)
+    end
+end
+
+local function getActiveTool()
+    local char = LocalPlayer and LocalPlayer.Character
+    if char then
+        for _, item in ipairs(char:GetChildren()) do
+            local ok, isTool = pcall(function() return item and item:IsA("Tool") end)
+            if ok and isTool then return item end
+        end
+    end
+    local backpack = LocalPlayer and LocalPlayer:FindFirstChild("Backpack")
+    if backpack then
+        for _, item in ipairs(backpack:GetChildren()) do
+            local ok, isTool = pcall(function() return item and item:IsA("Tool") end)
+            if ok and isTool then return item end
+        end
+    end
+    return nil
+end
+
+local function getPlayersInRange(radius)
+    local inRange = {}
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return inRange end
+    local pos = char.PrimaryPart.Position
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character.PrimaryPart then
+            local ok, mag = pcall(function() return (player.Character.PrimaryPart.Position - pos).Magnitude end)
+            if ok and mag and mag <= radius then
+                table.insert(inRange, player)
+            end
+        end
+    end
+    return inRange
+end
+
+local function AttackNearby()
+    if not Remote then return end
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return end
+    local tool = getActiveTool()
+    if not tool then return end
+    local okParent, parent = pcall(function() return tool.Parent end)
+    if not okParent or parent ~= LocalPlayer.Character then return end
+    local targets = getPlayersInRange(scanRadius)
+    for _, target in pairs(targets) do
+        if target and target.Character and target.Character.PrimaryPart then
+            local localPos = LocalPlayer.Character.PrimaryPart.Position
+            local enemyPos = target.Character.PrimaryPart.Position
+            if localPos and enemyPos then
+                local lookAtCFrame = CFrame.lookAt(localPos, enemyPos)
+                local args = {"melee_attack", tool, {target}, lookAtCFrame, 0.75}
+                pcall(function() CallRemote(Remote, table.unpack(args)) end)
+            end
+        end
+    end
+end
+
+local function StartAutoAttack()
+    if running then return end
+    running = true
+    task.spawn(function()
+        while running do
+            task.wait(scanInterval)
+            if hookEnabled and LocalPlayer and LocalPlayer.Character and LocalPlayer.Character.PrimaryPart then
+                pcall(AttackNearby)
+            end
+        end
+    end)
+end
+
+StartAutoAttack()
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    running = false
+    task.wait(0.1)
+    StartAutoAttack()
+end)
+
+
 
 
 
@@ -1545,6 +1662,18 @@ CombatTab:Dropdown({
                 plr:SetAttribute("SilentAimIgnore", true)
             end
         end
+    end
+})
+
+CombatTab:Divider()
+CombatTab:Section({Title = "Attack"})
+
+CombatTabTab:Toggle({
+    Title = "Hit Aura",
+	Desc = "โจมตีอัตโนมัติ(ต้องถืออาวุธ)",
+    Default = false,
+    Callback = function(state)
+        hookEnabled = state
     end
 })
 
