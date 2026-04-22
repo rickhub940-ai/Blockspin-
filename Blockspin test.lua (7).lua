@@ -2011,6 +2011,7 @@ ChaterTab:Section({Title = "Mod"})
 
 local AntiKillToggle = ChaterTab:Toggle({
     Title = "Anti Kill",
+	Desc = "กันตาย",
     Default = false,
     Callback = function(state)
         enabled = state
@@ -2034,6 +2035,28 @@ local AntiKillToggle = ChaterTab:Toggle({
     end
 })
 
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local function toggleName(state)
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if playerGui then
+        local nameDisplay = playerGui:FindFirstChild("NameDisplay")
+        if nameDisplay then
+            nameDisplay.Enabled = not state
+        end
+    end
+end
+
+
+ChaterTab:Toggle({
+    Title = "Hide Name",
+	Desc = "ปิดชื่อ(ปิดแค่เราคนเดียวคนอื่นเห็นเหมือนเดิม)",
+    Default = false,
+    Callback = function(state)
+        toggleName(state)
+    end
+})
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
 local pick
