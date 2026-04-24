@@ -275,9 +275,7 @@ local godBtn = createButton("God Mode", 4)
 -- ปุ่ม Normal Mode
 -- =========================
 normalBtn.MouseButton1Click:Connect(function()
-
-destroyUI()
-
+    
     local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -308,12 +306,13 @@ if splashGui and splashGui.Enabled then
 
     pressEnter(playButton)
 end
-    
+    destroyUI()
 end)
 
-
+-- =========================
+-- ปุ่ม God Mode
+-- =========================
 godBtn.MouseButton1Click:Connect(function()
-destroyUI()
     local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -416,7 +415,7 @@ end
 
 Net.send('death_screen_request_respawn')
     
-    
+    destroyUI()
 end)
 
 
