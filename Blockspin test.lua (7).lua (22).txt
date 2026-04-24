@@ -321,6 +321,43 @@ replicatesignal(game.Players.LocalPlayer.Kill)
 task.wait(7)
 
 
+
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService('GuiService')
+local VirtualInputManager = game:GetService('VirtualInputManager')
+local Creator = require(ReplicatedStorage.Modules.Game.CharacterCreator.CharacterCreator)
+local Net = require(ReplicatedStorage.Modules.Core.Net)
+local Util = require(ReplicatedStorage.Modules.Core.Util)
+local UI = require(ReplicatedStorage.Modules.Core.UI)
+local Char = require(ReplicatedStorage.Modules.Core.Char)
+
+if not _G.Bypass then 
+local func = getupvalue(Net.get, 2)
+if func then
+    setconstant(func, 3, "KUYIENGOKUYIENGO")
+    setconstant(func, 4, "KUYIENGOKUYIENGO")
+end
+_G.Bypass = true 
+end
+
+Net.send('death_screen_request_respawn')
+
+task.wait(1.5)
+
+    mainTriggered = true
+    runMainEvent:Fire()
+end)
+
+end
+
+if not mainTriggered then
+    runMainEvent.Event:Wait()
+end
+
+
+
 local WindUI = loadstring(game:HttpGet(
 "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
