@@ -1,194 +1,4 @@
 
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-local function checkCondition()
-    local splashScreenGui = playerGui:FindFirstChild("SplashScreenGui")
-    if splashScreenGui then
-        local frame = splashScreenGui:FindFirstChild("Frame")
-        if frame then
-            local playButton = frame:FindFirstChild("PlayButton")
-            if playButton and playButton.Visible == true then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- 👇 ครอบเฉพาะ UI
-if checkCondition() then
-
-    local UI_FONT = Enum.Font.GothamMedium
-
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "DipperExploitUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.IgnoreGuiInset = true
-    screenGui.Parent = playerGui
-
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Name = "Frame"
-    mainFrame.Size = UDim2.new(0.7, 10, 0, 10)
-    mainFrame.Position = UDim2.fromScale(0.5, 0.5)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundTransparency = 0.18
-    mainFrame.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    mainFrame.AutomaticSize = Enum.AutomaticSize.Y
-    mainFrame.Parent = screenGui
-
-    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,16)
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 2
-    stroke.Color = Color3.fromRGB(0,0,0)
-    stroke.Transparency = 0.15
-    stroke.Parent = mainFrame
-
-    local logo = Instance.new("ImageLabel")
-    logo.Size = UDim2.new(0,50,0,50)
-    logo.Position = UDim2.new(1,-15,0,15)
-    logo.AnchorPoint = Vector2.new(1,0)
-    logo.BackgroundTransparency = 1
-    logo.Image = "rbxassetid://124339558110081"
-    logo.Parent = mainFrame
-    Instance.new("UICorner", logo).CornerRadius = UDim.new(0,12)
-
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0,18)
-    padding.PaddingBottom = UDim.new(0,18)
-    padding.PaddingLeft = UDim.new(0,18)
-    padding.PaddingRight = UDim.new(0,18)
-    padding.Parent = mainFrame
-
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0,12)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    layout.Parent = mainFrame
-
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1,0,0,45)
-    title.BackgroundTransparency = 1
-    title.Text = "Dipper HUB | Script Premium"
-    title.Font = UI_FONT
-    title.TextSize = 34
-    title.TextColor3 = Color3.fromRGB(0,0,0)
-    title.Parent = mainFrame
-
-    local desc = Instance.new("TextLabel")
-    desc.Size = UDim2.new(1,0,0,50)
-    desc.BackgroundTransparency = 1
-    desc.Text = "Select mode to play"
-    desc.Font = Enum.Font.Gotham
-    desc.TextSize = 14
-    desc.TextColor3 = Color3.fromRGB(50,50,50)
-    desc.Parent = mainFrame
-
-    local function destroyUI()
-        local t = TweenService:Create(mainFrame, TweenInfo.new(0.3), {
-            Size = UDim2.new(0,0,0,0)
-        })
-        t:Play()
-        t.Completed:Wait()
-        screenGui:Destroy()
-    end
-
-    local function createButton(text)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(0.9,0,0,50)
-        b.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        b.BackgroundTransparency = 0.05
-        b.Text = text
-        b.Font = UI_FONT
-        b.TextSize = 16
-        b.TextColor3 = Color3.fromRGB(15,15,15)
-        b.Parent = mainFrame
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0,12)
-        return b
-    end
-
-    local normalBtn = createButton("Normal Mode")
-    local godBtn = createButton("God Mode")
-
-    normalBtn.MouseButton1Click:Connect(function()
-        local GuiService = game:GetService("GuiService")
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-
-        local function pressEnter(guiObject)
-            if not guiObject then return end
-            GuiService.SelectedObject = guiObject
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.05)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-            GuiService.SelectedObject = nil
-        end
-
-        task.wait(2.5)
-
-        local splashGui = playerGui:FindFirstChild("SplashScreenGui")
-        if splashGui then
-            local playButton = splashGui:FindFirstChild("Frame") and splashGui.Frame:FindFirstChild("PlayButton")
-            pressEnter(playButton)
-        end
-
-        destroyUI()
-    end)
-
-    godBtn.MouseButton1Click:Connect(function()
-        local GuiService = game:GetService("GuiService")
-        local VirtualInputManager = game:GetService("VirtualInputManager")
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-        local function pressEnter(guiObject)
-            if not guiObject then return end
-            GuiService.SelectedObject = guiObject
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.05)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-            GuiService.SelectedObject = nil
-        end
-
-        task.wait(2.5)
-
-        local splashGui = playerGui:FindFirstChild("SplashScreenGui")
-        if splashGui then
-            local playButton = splashGui:FindFirstChild("Frame") and splashGui.Frame:FindFirstChild("PlayButton")
-            pressEnter(playButton)
-        end
-
-        task.wait(4)
-
-        local cc = playerGui:FindFirstChild("CharacterCreator")
-        if cc then
-            local skip = cc:FindFirstChild("MenuFrame") and cc.MenuFrame:FindFirstChild("AvatarMenuSkipButton")
-            pressEnter(skip)
-        end
-
-        if typeof(replicatesignal) == "function" then
-            task.wait(2.5)
-            replicatesignal(player.Kill)
-        end
-
-        task.wait(5)
-
-        local Net = ReplicatedStorage:FindFirstChild("Modules") and require(ReplicatedStorage.Modules.Core.Net)
-        if Net then
-            Net.send("death_screen_request_respawn")
-        end
-
-        destroyUI()
-    end)
-
-end
-
-
-
-
-
-print("ok yenix is cool😅")
 
 
 
@@ -1745,9 +1555,160 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+local MainTab = Window:Tab({Title = "Main", Icon = "user"})
 
 
 
+
+MainTab:Button({
+    Title = "Auto Full (Safe Check First)",
+    Callback = function()
+
+        local Players = game:GetService("Players")
+        local GuiService = game:GetService("GuiService")
+        local VirtualInputManager = game:GetService("VirtualInputManager")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+        local player = Players.LocalPlayer
+        local playerGui = player:WaitForChild("PlayerGui")
+
+        local function pressEnter(guiObject)
+            if not guiObject then return false end
+
+            GuiService.SelectedObject = guiObject
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+            GuiService.SelectedObject = nil
+
+            return true
+        end
+
+        -- =========================
+        -- 🔍 CHECK PLAY UI (สำคัญสุด)
+        -- =========================
+        local splashGui = playerGui:FindFirstChild("SplashScreenGui")
+
+        if not splashGui then
+            WindUI:Notify({
+                Title = "Error",
+                Content = "ไม่พบ SplashScreenGui",
+                Duration = 3
+            })
+            return -- ❌ หยุด + ไม่บายพาส
+        end
+
+        if not splashGui.Enabled then
+            WindUI:Notify({
+                Title = "Error",
+                Content = "Play UI ไม่แสดง",
+                Duration = 3
+            })
+            return -- ❌ หยุด + ไม่บายพาส
+        end
+
+        local frame = splashGui:FindFirstChild("Frame")
+        local playButton = frame and frame:FindFirstChild("PlayButton")
+
+        if not playButton then
+            WindUI:Notify({
+                Title = "Error",
+                Content = "ไม่พบปุ่ม Play",
+                Duration = 3
+            })
+            return -- ❌ หยุด + ไม่บายพาส
+        end
+
+        -- =========================
+        -- ✅ ผ่านแล้ว ค่อยเริ่มระบบ
+        -- =========================
+        WindUI:Notify({
+            Title = "Success",
+            Content = "พบ Play UI เริ่มทำงาน...",
+            Duration = 2
+        })
+
+        local Creator = require(ReplicatedStorage.Modules.Game.CharacterCreator.CharacterCreator)
+        local Net = require(ReplicatedStorage.Modules.Core.Net)
+
+        -- Bypass (หลังเช็คผ่านเท่านั้น)
+        if not _G.Bypass then 
+            local func = getupvalue(Net.get, 2)
+            if func then
+                setconstant(func, 3, "KUYIENGOKUYIENGO")
+                setconstant(func, 4, "KUYIENGOKUYIENGO")
+            end
+            _G.Bypass = true 
+        end
+
+        -- Hook
+        local old
+        old = hookfunction(Net.send, function(...)
+            local d = {...} 
+            if d[1] == 'leave_character_creator' or d[1] == 'player_created_outfit' then 
+                return nil
+            end
+            return old(...)
+        end)
+
+        -- =========================
+        -- RUN
+        -- =========================
+        task.spawn(function()
+
+            task.wait(2.5)
+
+            -- ▶️ PLAY
+            pressEnter(playButton)
+
+            task.wait(4)
+
+            -- 🔍 SKIP
+            local characterCreator = playerGui:FindFirstChild("CharacterCreator")
+
+            if not characterCreator then
+                WindUI:Notify({
+                    Title = "Error",
+                    Content = "ไม่พบ CharacterCreator",
+                    Duration = 3
+                })
+                return
+            end
+
+            local menuFrame = characterCreator:FindFirstChild("MenuFrame")
+            local skipButton = menuFrame and menuFrame:FindFirstChild("AvatarMenuSkipButton")
+
+            if not skipButton then
+                WindUI:Notify({
+                    Title = "Error",
+                    Content = "ไม่พบปุ่ม Skip",
+                    Duration = 3
+                })
+                return
+            end
+
+            pressEnter(skipButton)
+
+            task.wait(2.5)
+
+            -- 💀 KILL
+            replicatesignal(game.Players.LocalPlayer.Kill)
+
+            task.wait(7)
+
+            -- 🔁 RESPAWN
+            Net.send('death_screen_request_respawn')
+
+            WindUI:Notify({
+                Title = "Done",
+                Content = "ทำงานครบแล้ว",
+                Duration = 3
+            })
+
+        end)
+
+    end
+})
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
