@@ -1,18 +1,17 @@
--- Dipper UI (Glass White + Black Border Clean)
-
+-- =========================
+-- 🔥 UI SELECTOR (วางไว้บนสุด)
+-- =========================
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- 🔥 Event + กันพลาด
+-- Event สำหรับรอโหลด main
 local runMainEvent = Instance.new("BindableEvent")
 local mainTriggered = false
 
--- =========================
--- ตรวจสอบเงื่อนไขก่อนโหลด UI
--- =========================
+-- ตรวจสอบเงื่อนไขก่อนโหลด UI Selector
 local function checkCondition()
     local splashScreenGui = playerGui:FindFirstChild("SplashScreenGui")
     if splashScreenGui then
@@ -27,237 +26,182 @@ local function checkCondition()
     return false
 end
 
--- 🔥 ถ้าไม่ผ่าน → ไปโค้ดหลักทันที
+-- ถ้าไม่ผ่านเงื่อนไข → ไป main เลย
 if not checkCondition() then
     mainTriggered = true
     runMainEvent:Fire()
 else
+    -- โหลด UI Selector
+    local UI_FONT = Enum.Font.GothamMedium
 
--- =========================
--- โหลด UI ต่อ
--- =========================
-local UI_FONT = Enum.Font.GothamMedium
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DipperExploitUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = playerGui
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DipperExploitUI"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = playerGui
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "Frame"
+    mainFrame.Size = UDim2.new(0.7, 10, 0, 10)
+    mainFrame.Position = UDim2.fromScale(0.5, 0.5)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    mainFrame.BackgroundTransparency = 0.18
+    mainFrame.BorderSizePixel = 0
+    mainFrame.AutomaticSize = Enum.AutomaticSize.Y
+    mainFrame.Parent = screenGui
 
--- =========================
--- Main Frame
--- =========================
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "Frame"
-mainFrame.Size = UDim2.new(0.7, 10, 0, 10)
-mainFrame.Position = UDim2.fromScale(0.5, 0.5)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundTransparency = 1
+    Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
 
-mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-mainFrame.BackgroundTransparency = 0.18
-mainFrame.BorderSizePixel = 0
-mainFrame.AutomaticSize = Enum.AutomaticSize.Y
-mainFrame.Parent = screenGui
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Transparency = 0.15
+    stroke.Parent = mainFrame
 
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
+    -- Logo
+    local logo = Instance.new("ImageLabel")
+    logo.Name = "Logo"
+    logo.Size = UDim2.new(0, 50, 0, 50)
+    logo.Position = UDim2.new(1, -15, 0, 15)
+    logo.AnchorPoint = Vector2.new(1, 0)
+    logo.BackgroundTransparency = 1
+    logo.Image = "rbxassetid://124339558110081"
+    logo.Parent = mainFrame
 
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(0, 0, 0)
-stroke.Transparency = 0.15
-stroke.Parent = mainFrame
+    local logoCorner = Instance.new("UICorner")
+    logoCorner.CornerRadius = UDim.new(0, 12)
+    logoCorner.Parent = logo
 
--- =========================
--- Logo ขอบขวาบน (ขอบมน)
--- =========================
-local logo = Instance.new("ImageLabel")
-logo.Name = "Logo"
-logo.Size = UDim2.new(0, 50, 0, 50)
-logo.Position = UDim2.new(1, -15, 0, 15)
-logo.AnchorPoint = Vector2.new(1, 0)
-logo.BackgroundTransparency = 1
-logo.Image = "rbxassetid://124339558110081"
-logo.Parent = mainFrame
+    -- Layout
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0, 18)
+    padding.PaddingBottom = UDim.new(0, 18)
+    padding.PaddingLeft = UDim.new(0, 18)
+    padding.PaddingRight = UDim.new(0, 18)
+    padding.Parent = mainFrame
 
-local logoCorner = Instance.new("UICorner")
-logoCorner.CornerRadius = UDim.new(0, 12)
-logoCorner.Parent = logo
+    local layout = Instance.new("UIListLayout")
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.VerticalAlignment = Enum.VerticalAlignment.Top
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.Padding = UDim.new(0, 12)
+    layout.Parent = mainFrame
 
--- =========================
--- Layout
--- =========================
-local padding = Instance.new("UIPadding")
-padding.PaddingTop = UDim.new(0, 18)
-padding.PaddingBottom = UDim.new(0, 18)
-padding.PaddingLeft = UDim.new(0, 18)
-padding.PaddingRight = UDim.new(0, 18)
-padding.Parent = mainFrame
+    -- Title
+    local title = Instance.new("TextLabel")
+    title.LayoutOrder = 1
+    title.Size = UDim2.new(1, 0, 0, 45)
+    title.BackgroundTransparency = 1
+    title.Text = "Dipper HUB | Script Premium"
+    title.Font = UI_FONT
+    title.TextSize = 34
+    title.TextColor3 = Color3.fromRGB(0, 0, 0)
+    title.TextStrokeTransparency = 0.9
+    title.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+    title.AutoLocalize = false
+    title.Parent = mainFrame
 
-local layout = Instance.new("UIListLayout")
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.VerticalAlignment = Enum.VerticalAlignment.Top
-layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.Padding = UDim.new(0, 12)
-layout.Parent = mainFrame
+    -- Description
+    local desc = Instance.new("TextLabel")
+    desc.LayoutOrder = 2
+    desc.Size = UDim2.new(1, 0, 0, 50)
+    desc.BackgroundTransparency = 1
+    desc.Text = "Select mode to play"
+    desc.Font = Enum.Font.Gotham
+    desc.TextSize = 14
+    desc.TextColor3 = Color3.fromRGB(50, 50, 50)
+    desc.TextStrokeTransparency = 0.9
+    desc.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+    desc.TextWrapped = true
+    desc.AutoLocalize = false
+    desc.Parent = mainFrame
 
--- =========================
--- Title
--- =========================
-local title = Instance.new("TextLabel")
-title.LayoutOrder = 1
-title.Size = UDim2.new(1, 0, 0, 45)
-title.BackgroundTransparency = 1
-title.Text = "Dipper HUB | Script Premium"
+    -- Function destroy UI
+    local function destroyUI()
+        local scaleDown = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1
+        })
+        scaleDown:Play()
+        scaleDown.Completed:Wait()
+        screenGui:Destroy()
+    end
 
-title.Font = UI_FONT
-title.TextSize = 34
-title.TextColor3 = Color3.fromRGB(0, 0, 0)
+    -- Animation เปิด UI
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    mainFrame.BackgroundTransparency = 1
+    stroke.Transparency = 1
 
-title.TextStrokeTransparency = 0.9
-title.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
-
-title.TextWrapped = false
-title.TextScaled = false
-
-title.AutoLocalize = false
-title.Parent = mainFrame
-
--- =========================
--- Description
--- =========================
-local desc = Instance.new("TextLabel")
-desc.LayoutOrder = 2
-desc.Size = UDim2.new(1, 0, 0, 50)
-desc.BackgroundTransparency = 1
-desc.Text = "Select mode to play "
-
-desc.Font = Enum.Font.Gotham
-desc.TextSize = 14
-desc.TextColor3 = Color3.fromRGB(50, 50, 50)
-
-desc.TextStrokeTransparency = 0.9
-desc.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
-
-desc.TextWrapped = true
-desc.TextScaled = false
-
-desc.AutoLocalize = false
-desc.Parent = mainFrame
-
--- =========================
--- 🔥 destroyUI (มีอนิเมชั่นหาย)
--- =========================
-local function destroyUI()
-    local scaleDown = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
-        Size = UDim2.new(0, 0, 0, 0),
-        BackgroundTransparency = 1
+    local appearTween = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0.7, 10, 0, 10),
+        BackgroundTransparency = 0.18
     })
-    
-    scaleDown:Play()
-    scaleDown.Completed:Wait()
-    screenGui:Destroy()
+    local strokeTween = TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Transparency = 0.15
+    })
+    appearTween:Play()
+    strokeTween:Play()
+
+    logo.Size = UDim2.new(0, 0, 0, 0)
+    logo.ImageTransparency = 1
+    local logoAppear = TweenService:Create(logo, TweenInfo.new(0.3, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 50, 0, 50),
+        ImageTransparency = 0
+    })
+    task.wait(0.2)
+    logoAppear:Play()
+
+    title.TextTransparency = 1
+    desc.TextTransparency = 1
+    TweenService:Create(title, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    TweenService:Create(desc, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+    -- Create Buttons
+    local function createButton(text, order)
+        local button = Instance.new("TextButton")
+        button.LayoutOrder = order
+        button.Size = UDim2.new(0.9, 0, 0, 50)
+        button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        button.BackgroundTransparency = 0.05
+        button.Text = text
+        button.Font = UI_FONT
+        button.TextSize = 16
+        button.TextColor3 = Color3.fromRGB(15, 15, 15)
+        button.TextStrokeTransparency = 0.9
+        button.Parent = mainFrame
+        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 12)
+        return button
+    end
+
+    local normalBtn = createButton("Normal Mode", 3)
+    local godBtn = createButton("God Mode", 4)
+
+    normalBtn.MouseButton1Click:Connect(function()
+        destroyUI()
+        task.wait(2.5)
+        mainTriggered = true
+        runMainEvent:Fire()
+    end)
+
+    godBtn.MouseButton1Click:Connect(function()
+        destroyUI()
+        task.wait(7)
+        mainTriggered = true
+        runMainEvent:Fire()
+    end)
 end
 
 -- =========================
--- อนิเมชั่นตอนโหลด UI (เหมือนเดิม)
--- =========================
-mainFrame.Size = UDim2.new(0, 0, 0, 0)
-mainFrame.BackgroundTransparency = 1
-stroke.Transparency = 1
-
-local appearTween = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-    Size = UDim2.new(0.7, 10, 0, 10),
-    BackgroundTransparency = 0.18
-})
-
-local strokeTween = TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-    Transparency = 0.15
-})
-
-appearTween:Play()
-strokeTween:Play()
-
-logo.Size = UDim2.new(0, 0, 0, 0)
-logo.ImageTransparency = 1
-
-local logoAppear = TweenService:Create(logo, TweenInfo.new(0.3, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
-    Size = UDim2.new(0, 50, 0, 50),
-    ImageTransparency = 0
-})
-task.wait(0.2)
-logoAppear:Play()
-
-title.TextTransparency = 1
-desc.TextTransparency = 1
-
-TweenService:Create(title, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-TweenService:Create(desc, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
-
--- =========================
--- Button Creator
--- =========================
-local function createButton(text, order)
-    local button = Instance.new("TextButton")
-    button.LayoutOrder = order
-    button.Size = UDim2.new(0.9, 0, 0, 50)
-    button.BackgroundTransparency = 1
-
-    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    button.BackgroundTransparency = 0.05
-    button.Text = text
-
-    button.Font = UI_FONT
-    button.TextSize = 16
-    button.TextColor3 = Color3.fromRGB(15, 15, 15)
-
-    button.TextStrokeTransparency = 0.9
-    button.Parent = mainFrame
-
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 12)
-
-    return button
-end
-
-local normalBtn = createButton("Normal Mode", 3)
-local godBtn = createButton("God Mode", 4)
-
--- =========================
--- Normal Mode
--- =========================
-normalBtn.MouseButton1Click:Connect(function()
-
-    destroyUI()
-
-    task.wait(2.5)
-
-    mainTriggered = true
-    runMainEvent:Fire()
-end)
-
--- =========================
--- God Mode
--- =========================
-godBtn.MouseButton1Click:Connect(function()
-
-    destroyUI()
-
-    task.wait(7)
-
-    mainTriggered = true
-    runMainEvent:Fire()
-end)
-
-end
-
--- =========================
--- 🔥 โค้ดหลัก (ล่างสุด)
+-- รอให้ main โหลด
 -- =========================
 if not mainTriggered then
     runMainEvent.Event:Wait()
 end
 
-print("🎯 สคริปต์หลักกำลังทำงาน...")
+-- =========================
+-- 🔥 โค้ดเดิมของคุณทั้งหมดต่อจากนี้
+-- =========================
 
 
 
