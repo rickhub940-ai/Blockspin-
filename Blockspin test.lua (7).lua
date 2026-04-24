@@ -1,5 +1,366 @@
 
 
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+
+local runMainEvent = Instance.new("BindableEvent")
+local mainTriggered = false
+
+local function checkCondition()
+    local splashScreenGui = playerGui:FindFirstChild("SplashScreenGui")
+    if splashScreenGui then
+        local frame = splashScreenGui:FindFirstChild("Frame")
+        if frame then
+            local playButton = frame:FindFirstChild("PlayButton")
+            if playButton and playButton.Visible == true then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+
+if not checkCondition() then
+    mainTriggered = true
+    runMainEvent:Fire()
+else
+
+
+local UI_FONT = Enum.Font.GothamMedium
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DipperExploitUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = playerGui
+
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "Frame"
+mainFrame.Size = UDim2.new(0.7, 10, 0, 10)
+mainFrame.Position = UDim2.fromScale(0.5, 0.5)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundTransparency = 1
+
+mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mainFrame.BackgroundTransparency = 0.18
+mainFrame.BorderSizePixel = 0
+mainFrame.AutomaticSize = Enum.AutomaticSize.Y
+mainFrame.Parent = screenGui
+
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(0, 0, 0)
+stroke.Transparency = 0.15
+stroke.Parent = mainFrame
+
+local logo = Instance.new("ImageLabel")
+logo.Name = "Logo"
+logo.Size = UDim2.new(0, 50, 0, 50)
+logo.Position = UDim2.new(1, -15, 0, 15)
+logo.AnchorPoint = Vector2.new(1, 0)
+logo.BackgroundTransparency = 1
+logo.Image = "rbxassetid://124339558110081"
+logo.Parent = mainFrame
+
+local logoCorner = Instance.new("UICorner")
+logoCorner.CornerRadius = UDim.new(0, 12)
+logoCorner.Parent = logo
+
+local padding = Instance.new("UIPadding")
+padding.PaddingTop = UDim.new(0, 18)
+padding.PaddingBottom = UDim.new(0, 18)
+padding.PaddingLeft = UDim.new(0, 18)
+padding.PaddingRight = UDim.new(0, 18)
+padding.Parent = mainFrame
+
+local layout = Instance.new("UIListLayout")
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.VerticalAlignment = Enum.VerticalAlignment.Top
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.Padding = UDim.new(0, 12)
+layout.Parent = mainFrame
+
+
+local title = Instance.new("TextLabel")
+title.LayoutOrder = 1
+title.Size = UDim2.new(1, 0, 0, 45)
+title.BackgroundTransparency = 1
+title.Text = "Dipper HUB | Script Premium"
+
+title.Font = UI_FONT
+title.TextSize = 34
+title.TextColor3 = Color3.fromRGB(0, 0, 0)
+
+title.TextStrokeTransparency = 0.9
+title.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+
+title.TextWrapped = false
+title.TextScaled = false
+
+title.AutoLocalize = false
+title.Parent = mainFrame
+
+
+local desc = Instance.new("TextLabel")
+desc.LayoutOrder = 2
+desc.Size = UDim2.new(1, 0, 0, 50)
+desc.BackgroundTransparency = 1
+desc.Text = "Select mode to play "
+
+desc.Font = Enum.Font.Gotham
+desc.TextSize = 14
+desc.TextColor3 = Color3.fromRGB(50, 50, 50)
+
+desc.TextStrokeTransparency = 0.9
+desc.TextStrokeColor3 = Color3.fromRGB(255, 255, 255)
+
+desc.TextWrapped = true
+desc.TextScaled = false
+
+desc.AutoLocalize = false
+desc.Parent = mainFrame
+
+local function destroyUI()
+    local scaleDown = TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1
+    })
+    
+    scaleDown:Play()
+    scaleDown.Completed:Wait()
+    screenGui:Destroy()
+end
+
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.BackgroundTransparency = 1
+stroke.Transparency = 1
+
+local appearTween = TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0.7, 10, 0, 10),
+    BackgroundTransparency = 0.18
+})
+
+local strokeTween = TweenService:Create(stroke, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    Transparency = 0.15
+})
+
+appearTween:Play()
+strokeTween:Play()
+
+logo.Size = UDim2.new(0, 0, 0, 0)
+logo.ImageTransparency = 1
+
+local logoAppear = TweenService:Create(logo, TweenInfo.new(0.3, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 50, 0, 50),
+    ImageTransparency = 0
+})
+task.wait(0.2)
+logoAppear:Play()
+
+title.TextTransparency = 1
+desc.TextTransparency = 1
+
+TweenService:Create(title, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+TweenService:Create(desc, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+
+local function createButton(text, order)
+    local button = Instance.new("TextButton")
+    button.LayoutOrder = order
+    button.Size = UDim2.new(0.9, 0, 0, 50)
+    button.BackgroundTransparency = 1
+
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundTransparency = 0.05
+    button.Text = text
+
+    button.Font = UI_FONT
+    button.TextSize = 16
+    button.TextColor3 = Color3.fromRGB(15, 15, 15)
+
+    button.TextStrokeTransparency = 0.9
+    button.Parent = mainFrame
+
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 12)
+
+    return button
+end
+
+local normalBtn = createButton("Normal Mode", 3)
+local godBtn = createButton("God Mode", 4)
+
+
+normalBtn.MouseButton1Click:Connect(function()
+
+    destroyUI()
+local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local function pressEnter(guiObject)
+    if not guiObject then return end
+
+    GuiService.SelectedObject = guiObject
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    task.wait(0.2)
+    GuiService.SelectedObject = nil
+end
+
+
+task.wait(2.5)
+
+
+local splashGui = playerGui:FindFirstChild("SplashScreenGui")
+if splashGui and splashGui.Enabled then
+    local frame = splashGui:FindFirstChild("Frame")
+    local playButton = frame and frame:FindFirstChild("PlayButton")
+
+    pressEnter(playButton)
+			end
+
+			
+    task.wait(1)
+
+    mainTriggered = true
+    runMainEvent:Fire()
+end)
+
+
+godBtn.MouseButton1Click:Connect(function()
+
+    destroyUI()
+
+local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService('GuiService')
+local VirtualInputManager = game:GetService('VirtualInputManager')
+local Creator = require(ReplicatedStorage.Modules.Game.CharacterCreator.CharacterCreator)
+local Net = require(ReplicatedStorage.Modules.Core.Net)
+local Util = require(ReplicatedStorage.Modules.Core.Util)
+local UI = require(ReplicatedStorage.Modules.Core.UI)
+local Char = require(ReplicatedStorage.Modules.Core.Char)
+
+if not _G.Bypass then 
+local func = getupvalue(Net.get, 2)
+if func then
+    setconstant(func, 3, "KUYIENGOKUYIENGO")
+    setconstant(func, 4, "KUYIENGOKUYIENGO")
+end
+_G.Bypass = true 
+end
+
+local old; old = hookfunction(Net.send, function(...)
+    local d = {...} 
+    if d[1] == 'leave_character_creator' or d[1] == 'player_created_outfit' then 
+        return nil
+    end
+    return old(...)
+end)
+
+
+ 
+task.wait(2.5)
+
+local function pressEnter(guiObject)
+    if not guiObject then return end
+
+    GuiService.SelectedObject = guiObject
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+    task.wait(0.2)
+    GuiService.SelectedObject = nil
+end
+
+
+local splashGui = playerGui:FindFirstChild("SplashScreenGui")
+if splashGui and splashGui.Enabled then
+    local frame = splashGui:FindFirstChild("Frame")
+    local playButton = frame and frame:FindFirstChild("PlayButton")
+
+    pressEnter(playButton)
+end
+
+
+task.wait(4)
+
+local characterCreator = playerGui:FindFirstChild("CharacterCreator")
+if characterCreator then
+    local menuFrame = characterCreator:FindFirstChild("MenuFrame")
+    local skipButton = menuFrame and menuFrame:FindFirstChild("AvatarMenuSkipButton")
+
+    pressEnter(skipButton)
+end
+
+
+
+task.wait(2.5)
+
+
+replicatesignal(game.Players.LocalPlayer.Kill)
+
+
+task.wait(7)
+
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GuiService = game:GetService('GuiService')
+local VirtualInputManager = game:GetService('VirtualInputManager')
+local Creator = require(ReplicatedStorage.Modules.Game.CharacterCreator.CharacterCreator)
+local Net = require(ReplicatedStorage.Modules.Core.Net)
+local Util = require(ReplicatedStorage.Modules.Core.Util)
+local UI = require(ReplicatedStorage.Modules.Core.UI)
+local Char = require(ReplicatedStorage.Modules.Core.Char)
+
+if not _G.Bypass then 
+local func = getupvalue(Net.get, 2)
+if func then
+    setconstant(func, 3, "KUYIENGOKUYIENGO")
+    setconstant(func, 4, "KUYIENGOKUYIENGO")
+end
+_G.Bypass = true 
+end
+
+Net.send('death_screen_request_respawn')
+
+task.wait(1.5)
+
+    mainTriggered = true
+    runMainEvent:Fire()
+end)
+
+end
+
+-- =========================
+-- 🔥 โค้ดหลัก (ล่างสุด)
+-- =========================
+if not mainTriggered then
+    runMainEvent.Event:Wait()
+end
+
+
+
 local WindUI = loadstring(game:HttpGet(
 "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
