@@ -1404,12 +1404,20 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 -- Anti Aim
-getgenv().AntiAim = false
+
+getgenv().AntiAimAssiant = false
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local Client = Players.LocalPlayer
+local Char = require(game.ReplicatedStorage.Modules.Core.Char)
 
 RunService.Heartbeat:Connect(function()
-    if getgenv().AntiAim then   
+    if getgenv().AntiAimAssiant then
         local HumanoidModule = Char.get_hum()
-        if HumanoidModule and not HumanoidModule:GetAttribute("HasBeenDowned") then 
+
+        if HumanoidModule and not HumanoidModule:GetAttribute("HasBeenDowned") then
             local RootPartModule = Char.get_hrp()
             if not RootPartModule then return end
 
@@ -1418,21 +1426,21 @@ RunService.Heartbeat:Connect(function()
             local C = RootPartModule.AssemblyAngularVelocity
 
             RootPartModule.Velocity = Vector3.new(
-                math.random(-100000,999999),
-                math.random(-100000,999999),
-                math.random(-100000,999999)
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999)
             )
 
             RootPartModule.AssemblyLinearVelocity = Vector3.new(
-                math.random(-100000,999999),
-                math.random(-100000,999999),
-                math.random(-100000,999999)
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999)
             )
 
             RootPartModule.AssemblyAngularVelocity = Vector3.new(
-                math.random(-100000,999999),
-                math.random(-100000,999999),
-                math.random(-100000,999999)
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999),
+                math.random(-99999999,99999999)
             )
 
             RunService.RenderStepped:Wait()
@@ -1444,7 +1452,9 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ==================== TABS ====================
+
+
+
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
 CombatTab:Toggle({
@@ -1828,7 +1838,7 @@ end})
 
 ChaterTab:Slider({Title = "Jump power valu (ปรับความสูง)", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
 
--- Speed Boost (CFrame Based)
+
 local speedEnabled = false
 local speedValue = 0.8
 local speedConnection = nil
@@ -1858,7 +1868,7 @@ local function startSpeed()
 end
 
 ChaterTab:Toggle({
-    Title = "Speed Boost)",
+    Title = "Speed Boost",
     Desc = "เพิ่มความเร็วในการเคลื่อนที่",
     Default = false,
     Callback = function(state)
@@ -1888,13 +1898,12 @@ ChaterTab:Slider({
     end
 })
 
-ChaterTab:Toggle({
-    Title = "Anti Aim",
-    Desc = "กันล็อค(ถ้าเปิดจะกระโดดสูงไม่ได้)",
-    Flag = "antiaim",
-    Value = false,
+CombatTab:Toggle({
+    Title = "Anti Aim Assistant",
+	Desc = "กันล็อค",
+    Default = getgenv().AntiAimAssiant,
     Callback = function(v)
-        getgenv().AntiAim = v
+        getgenv().AntiAimAssiant = v
     end
 })
 
@@ -1902,14 +1911,14 @@ ChaterTab:Divider()
 ChaterTab:Section({Title = "Mod"})
 local AntiKillToggle = ChaterTab:Toggle({
     Title = "Anti Kill",
-	Desc = "เธเธฑเธเธ•เธฒเธข",
+	Desc = "กันตาย",
     Default = false,
     Callback = function(state)
         enabled = state
         if state then
             if WindUI then
                 WindUI:Notify({
-                    Title = "๐ก๏ธ Anti Kill Enabled",
+                    Title = "Anti Kill Enabled",
                     Description = "",
                     Duration = 3
                 })
@@ -1917,7 +1926,7 @@ local AntiKillToggle = ChaterTab:Toggle({
         else
             if WindUI then
                 WindUI:Notify({
-                    Title = "โ Anti Kill Disabled",
+                    Title = "Anti Kill Disabled",
                     Description = "",
                     Duration = 3
                 })
@@ -2029,80 +2038,10 @@ ChaterTab:Toggle({
     end
 })
 
--- มุดดิน
-local EnabledSnapRunning = false
-local YoffsetValue = 10
-local snapThread = nil
 
-local function GetDeltaY(baseY, currentY, offset)
-    return (baseY - offset) - currentY
-end
 
-local function SetSnapState(state)
-    EnabledSnapRunning = state
-    getgenv().Snap = state
 
-    if snapThread then
-        task.cancel(snapThread)
-        snapThread = nil
-    end
 
-    if state then
-        snapThread = task.spawn(function()
-            local baseY = nil
-
-            while EnabledSnapRunning do
-                task.wait(0.01)
-
-                local char = Char.get()
-                local hrp = Char.get_hrp()
-
-                if char and hrp then
-                    if not baseY then
-                        baseY = hrp.Position.Y
-                    end
-
-                    local currentY = hrp.Position.Y
-                    local deltaY = GetDeltaY(baseY, currentY, YoffsetValue)
-
-                    char:PivotTo(hrp.CFrame * CFrame.new(0, deltaY, 0))
-                else
-                    baseY = nil
-                end
-            end
-        end)
-    end
-end
-
-ChaterTab:Toggle({
-    Title = "Snap Under Map",
-    Desc = "มุดดิน",
-    Default = false,
-    Callback = function(state)
-        SetSnapState(state)
-    end
-})
-
-ChaterTab:Keybind({
-    Title = "Snap Keybind",
-    Desc = "คีย์ลัดสำหรับPC",
-    Flag = "snap_keybind",
-    Value = "G",
-    Callback = function()
-        SetSnapState(not EnabledSnapRunning)
-    end
-})
-
-ChaterTab:Slider({
-    Title = "Snap Depth",
-    Desc = "ระยะในการมุด",
-    Flag = "snap_height",
-    Step = 1,
-    Value = { Min = 1, Max = 50, Default = YoffsetValue },
-    Callback = function(value)
-        YoffsetValue = value
-    end
-})
 
 local carTab = Window:Tab({Title = "Car", Icon = "car"})
 
