@@ -1,4 +1,4 @@
--- ==================== SERVICES (ย้ายมาด้านบน ประกาศครั้งเดียว) ====================
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
@@ -23,16 +23,14 @@ local Client = Players.LocalPlayer
 
 
 
-
 local TweenService = game:GetService("TweenService")
-
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
---// ================= STATE =================
+
 local Done = false
 
---// ================= CHECK =================
+
 local function checkCondition()
     local splashScreenGui = playerGui:FindFirstChild("SplashScreenGui")
     if splashScreenGui then
@@ -49,7 +47,7 @@ end
 
 local canShowUI = checkCondition()
 
---// ================= UI =================
+
 if canShowUI then
 
     local UI_FONT = Enum.Font.GothamMedium
@@ -182,7 +180,6 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ฟังก์ชันกด Enter (เหมือนของเดิมเป๊ะ)
 local function pressEnter(guiObject)
     if not guiObject then return end
 
@@ -194,10 +191,8 @@ local function pressEnter(guiObject)
     GuiService.SelectedObject = nil
 end
 
--- เหมือนของเดิม: รอแล้วค่อยกด
 task.wait(2.5)
 
--- SplashScreenGui -> PlayButton (เหมือนโค้ดคุณเป๊ะ)
 local splashGui = playerGui:FindFirstChild("SplashScreenGui")
 if splashGui and splashGui.Enabled then
     local frame = splashGui:FindFirstChild("Frame")
@@ -268,7 +263,7 @@ local function pressEnter(guiObject)
     GuiService.SelectedObject = nil
 end
 
--- SplashScreenGui -> PlayButton
+
 local splashGui = playerGui:FindFirstChild("SplashScreenGui")
 if splashGui and splashGui.Enabled then
     local frame = splashGui:FindFirstChild("Frame")
@@ -280,7 +275,7 @@ end
 
 task.wait(4)
 
--- CharacterCreator -> SkipButton
+
 local characterCreator = playerGui:FindFirstChild("CharacterCreator")
 if characterCreator then
     local menuFrame = characterCreator:FindFirstChild("MenuFrame")
@@ -331,14 +326,8 @@ else
     Done = true
 end
 
---// ================= WAIT =================
+
 repeat task.wait() until Done
-
---// ================= MAIN SCRIPT =================
-print("MAIN SCRIPT RUNNING")
-
-
-
 
 
 
@@ -349,7 +338,7 @@ print("MAIN SCRIPT RUNNING")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- ==================== โค้ดเดิมเริ่มต้นที่นี่ ====================
+
 local WindUI = loadstring(game:HttpGet(
 "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
 ))()
@@ -1910,7 +1899,7 @@ CombatTab:Dropdown({
 
 
 
-local WeaponTab = Window:Tab({Title = "Gun Mod", Icon = "gun"})
+local WeaponTab = Window:Tab({Title = "Gun Mod", Icon = "hammer"})
 
 
 
