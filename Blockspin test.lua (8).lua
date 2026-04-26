@@ -1097,10 +1097,6 @@ end)
 --  Esp items 
 
 
--- ========== ESP Inventory Viewer (ไอเท็มในกระเป๋าผู้เล่น) ==========
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Client = Players.LocalPlayer
 
 local InventoryESPEnabled = false
 local espLoop = nil
