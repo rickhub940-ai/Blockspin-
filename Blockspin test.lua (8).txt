@@ -1017,9 +1017,22 @@ task.spawn(function()
 end)
 
 -- Anti kill
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+local CharModule = require(game.ReplicatedStorage.Modules.Core.Char)
+
+
 local enabled = false
 local flickering = false
 local undergroundBaseCFrame = nil
+local DROP_DEPTH = -55
+local MOVE_RADIUS = 10
+local FLICKER_RATE = 0.1
 
 local function isDowned()
     local hum = CharModule.get_hum()
@@ -1079,6 +1092,8 @@ RunService.Heartbeat:Connect(function()
         flickering = false
     end
 end)
+
+
 
 -- Esp items drop
 local itemsFolder = ReplicatedStorage:WaitForChild("Items")
@@ -1843,7 +1858,7 @@ local function startSpeed()
 end
 
 ChaterTab:Toggle({
-    Title = "Speed Boost (CFrame)",
+    Title = "Speed Boost)",
     Desc = "เพิ่มความเร็วในการเคลื่อนที่",
     Default = false,
     Callback = function(state)
@@ -1861,11 +1876,11 @@ ChaterTab:Toggle({
 
 ChaterTab:Slider({
     Title = "Speed Value",
-    Desc = "ปรับค่าความเร็ว (1 - 1.3)",
+    Desc = "ปรับค่าความเร็ว",
     Step = 0.01,
     Value = {
-        Min = 1,
-        Max = 1.3,
+        Min = 0.8,
+        Max = 1,
         Default = 1
     },
     Callback = function(v)
@@ -1885,17 +1900,16 @@ ChaterTab:Toggle({
 
 ChaterTab:Divider()
 ChaterTab:Section({Title = "Mod"})
-
 local AntiKillToggle = ChaterTab:Toggle({
     Title = "Anti Kill",
-    Desc = "กันตาย",
+	Desc = "เธเธฑเธเธ•เธฒเธข",
     Default = false,
     Callback = function(state)
         enabled = state
         if state then
             if WindUI then
                 WindUI:Notify({
-                    Title = "🛡️ Anti Kill Enabled",
+                    Title = "๐ก๏ธ Anti Kill Enabled",
                     Description = "",
                     Duration = 3
                 })
@@ -1903,7 +1917,7 @@ local AntiKillToggle = ChaterTab:Toggle({
         else
             if WindUI then
                 WindUI:Notify({
-                    Title = "❌ Anti Kill Disabled",
+                    Title = "โ Anti Kill Disabled",
                     Description = "",
                     Duration = 3
                 })
