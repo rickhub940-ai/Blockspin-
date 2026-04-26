@@ -13,7 +13,13 @@ local Net = require(ReplicatedStorage.Modules.Core.Net)
 local RagdollModule = require(game.ReplicatedStorage.Modules.Game.Ragdoll)
 local CharModule = require(game.ReplicatedStorage.Modules.Core.Char)
 
--- ==================== OBJECTS (ย้ายมาด้านบน) ====================
+local Client = Players.LocalPlayer
+
+
+
+
+
+
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
@@ -1446,6 +1452,43 @@ RunService.Heartbeat:Connect(function()
 end)
 
 
+-- มุดดิน
+
+
+
+
+local SnapEnabled = false
+local SnapDepth = 10
+local snapThread = nil
+
+local function StartSnap()
+    if SnapEnabled then return end
+    SnapEnabled = true
+    
+    if snapThread then task.cancel(snapThread) end
+    
+    snapThread = task.spawn(function()
+        local baseY = nil
+        while SnapEnabled do
+            task.wait(0.01)
+            local char = Char.get()
+            local hrp = Char.get_hrp()
+            if char and hrp then
+                if not baseY then baseY = hrp.Position.Y end
+                local deltaY = (baseY - SnapDepth) - hrp.Position.Y
+                char:PivotTo(hrp.CFrame * CFrame.new(0, deltaY, 0))
+            else
+                baseY = nil
+            end
+        end
+    end)
+end
+
+local function StopSnap()
+    SnapEnabled = false
+    if snapThread then task.cancel(snapThread) snapThread = nil end
+end
+
 
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
@@ -1891,6 +1934,35 @@ ChaterTab:Toggle({
 })
 
 
+
+
+ChaterTab:Toggle({
+    Title = "Snap Under Map",
+    Desc = "มุดดิน",
+    Default = false,
+    Callback = function(state)
+        if state then StartSnap() else StopSnap() end
+    end
+})
+
+ChaterTab:Slider({
+    Title = "Snap Depth",
+    Desc = "ความลึกในการมุด",
+    Step = 1,
+    Value = { Min = 1, Max = 50, Default = 10 },
+    Callback = function(value)
+        SnapDepth = value
+    end
+})
+
+ChaterTab:Keybind({
+    Title = "Snap Keybind",
+    Desc = "ปุ่มลัดเปิดปิดมุดดิน",
+    Value = "G",
+    Callback = function()
+        if SnapEnabled then StopSnap() else StartSnap() end
+    end
+})
 
 
 
