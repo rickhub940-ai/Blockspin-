@@ -1680,6 +1680,242 @@ CombatTab:Dropdown({
     end
 })
 
+
+
+
+
+
+
+
+
+
+
+
+local WeaponTab = Window:Tab({Title = "Gun Mod", Icon = "gun"})
+
+
+
+local Backpack = Client:WaitForChild("Backpack")
+
+--// SETTINGS
+local GunModSettings = {
+    Enabled = false,
+    accuracy = math.huge,
+    range = math.huge,
+    Recoil = 0,
+    fire_rate = math.huge,
+    reload_time = 0,
+    automatic = true
+}
+
+--// UI
+local CurrentGunLabel = WeaponTab:Button({
+    Title = "Current Gun",
+    Desc = "None"
+})
+
+--// ================= UTIL =================
+
+local function SafeSet(gun, attr, value)
+    if gun and gun:GetAttribute(attr) ~= value then
+        gun:SetAttribute(attr, value)
+    end
+end
+
+local function FindAttr(gun, name, fallback)
+    if not gun then return nil end
+
+    if gun:GetAttribute(name) ~= nil then
+        return name
+    end
+
+    for attr in pairs(gun:GetAttributes()) do
+        if type(attr) == "string" and attr:sub(-3) == fallback then
+            return attr
+        end
+    end
+end
+
+local function IsGun(tool)
+    return tool and tool:IsA("Tool") and (
+        tool:GetAttribute("reload_time")
+        or tool:GetAttribute("AmmoType")
+        or FindAttr(tool, "fire_rate", "486")
+    )
+end
+
+--// ================= CORE =================
+
+local function ModifyGun(gun)
+    if not IsGun(gun) then return end
+
+    pcall(function()
+        SafeSet(gun, "accuracy", GunModSettings.accuracy)
+        SafeSet(gun, "range", GunModSettings.range)
+        SafeSet(gun, "Recoil", GunModSettings.Recoil)
+        SafeSet(gun, "reload_time", GunModSettings.reload_time)
+
+        local fireAttr = FindAttr(gun, "fire_rate", "486") or "fire_rate"
+        SafeSet(gun, fireAttr, GunModSettings.fire_rate)
+
+        local autoAttr = FindAttr(gun, "automatic", "492") or "automatic"
+        SafeSet(gun, autoAttr, GunModSettings.automatic)
+    end)
+end
+
+local function UpdateAll()
+    for _, v in pairs(Backpack:GetChildren()) do
+        ModifyGun(v)
+    end
+
+    local char = Client.Character
+    if char then
+        ModifyGun(char:FindFirstChildOfClass("Tool"))
+    end
+end
+
+--// ================= REALTIME =================
+
+local Connections = {}
+
+local function WatchGun(gun)
+    if not IsGun(gun) or Connections[gun] then return end
+
+    local fireAttr = FindAttr(gun, "fire_rate", "486")
+    if not fireAttr then return end
+
+    Connections[gun] = gun:GetAttributeChangedSignal(fireAttr):Connect(function()
+        if GunModSettings.Enabled then
+            SafeSet(gun, fireAttr, GunModSettings.fire_rate)
+        end
+    end)
+end
+
+local function ClearConnections()
+    for _, c in pairs(Connections) do
+        pcall(function() c:Disconnect() end)
+    end
+    Connections = {}
+end
+
+--// ================= START / STOP =================
+
+local BackpackConn, CharConn
+
+local function Start()
+    ClearConnections()
+    UpdateAll()
+
+    for _, v in pairs(Backpack:GetChildren()) do
+        WatchGun(v)
+    end
+
+    BackpackConn = Backpack.ChildAdded:Connect(function(tool)
+        if GunModSettings.Enabled and IsGun(tool) then
+            task.wait()
+            ModifyGun(tool)
+            WatchGun(tool)
+        end
+    end)
+
+    local char = Client.Character
+    if char then
+        CharConn = char.ChildAdded:Connect(function(tool)
+            if GunModSettings.Enabled and IsGun(tool) then
+                task.wait()
+                ModifyGun(tool)
+                WatchGun(tool)
+                CurrentGunLabel:SetDesc(tool.Name)
+            end
+        end)
+    end
+end
+
+local function Stop()
+    if BackpackConn then BackpackConn:Disconnect() end
+    if CharConn then CharConn:Disconnect() end
+
+    ClearConnections()
+    CurrentGunLabel:SetDesc("None")
+end
+
+--// ================= UI =================
+
+WeaponTab:Toggle({
+    Title = "Enable Gun Mod",
+    Default = false,
+    Callback = function(v)
+        GunModSettings.Enabled = v
+        if v then
+            Start()
+        else
+            Stop()
+        end
+    end
+})
+
+WeaponTab:Divider()
+
+WeaponTab:Toggle({
+    Title = "Inf Accuracy",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.accuracy = v and math.huge or 1
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+WeaponTab:Toggle({
+    Title = "Inf Range",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.range = v and math.huge or 100
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+WeaponTab:Toggle({
+    Title = "No Recoil",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.Recoil = v and 0 or 1
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+WeaponTab:Toggle({
+    Title = "Inf Fire Rate",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.fire_rate = v and math.huge or 0.1
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+WeaponTab:Toggle({
+    Title = "Min Reload",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.reload_time = v and 0 or 2
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+WeaponTab:Toggle({
+    Title = "Automatic",
+    Default = true,
+    Callback = function(v)
+        GunModSettings.automatic = v
+        if GunModSettings.Enabled then UpdateAll() end
+    end
+})
+
+
+
+
+
+
+
 local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 
 EspTab:Toggle({
