@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Net = require(ReplicatedStorage.Modules.Core.Net)
 local RagdollModule = require(game.ReplicatedStorage.Modules.Game.Ragdoll)
+local CharModule = require(game.ReplicatedStorage.Modules.Core.Char)
 
 -- ==================== OBJECTS (ย้ายมาด้านบน) ====================
 local Camera = workspace.CurrentCamera
@@ -1017,14 +1018,8 @@ task.spawn(function()
 end)
 
 -- Anti kill
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
-local LocalPlayer = Players.LocalPlayer
 
-local CharModule = require(game.ReplicatedStorage.Modules.Core.Char)
 
 
 local enabled = false
@@ -1407,8 +1402,6 @@ end)
 
 getgenv().AntiAimAssiant = false
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local Client = Players.LocalPlayer
 local Char = require(game.ReplicatedStorage.Modules.Core.Char)
@@ -1580,149 +1573,8 @@ EspTab:Toggle({
     end
 })
 
-EspTab:Toggle({
-    Title = 'Esp Inventory',
-    Desc = "แสดงไอเท็มในกระเป๋าทุกคน",
-    Default = true,
-    Callback = function(Value)
-        _G.InventoryViewerEnabled = Value
-        if Value then
-            if not _G.ViewerRunning then
-                _G.ViewerRunning = true
-                task.spawn(function()
-                    while task.wait(0.2) do
-                        if not _G.InventoryViewerEnabled then
-                            continue
-                        end
-                        pcall(function()
-                            for _, v in pairs(Players:GetPlayers()) do
-                                if v ~= Client and v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
-                                    local root = v.Character.HumanoidRootPart
-                                    local gui = root:FindFirstChild('ItemBillboard')
-                                    if not gui then
-                                        gui = Instance.new('BillboardGui')
-                                        gui.Name = 'ItemBillboard'
-                                        gui.AlwaysOnTop = true
-                                        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                                        gui.Size = UDim2.new(0, 200, 0, 50)
-                                        gui.StudsOffset = Vector3.new(0, -5, 0)
-                                        gui.ExtentsOffset = Vector3.new(0, 1, 0)
-                                        gui.LightInfluence = 1
-                                        gui.Parent = root
 
-                                        local bg = Instance.new('Frame')
-                                        bg.Name = 'BG'
-                                        bg.BackgroundTransparency = 1
-                                        bg.Size = UDim2.new(1, 0, 1, 0)
-                                        bg.AnchorPoint = Vector2.new(0.5, 0.5)
-                                        bg.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                        bg.Parent = gui
 
-                                        local layout = Instance.new('UIListLayout')
-                                        layout.FillDirection = Enum.FillDirection.Horizontal
-                                        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-                                        layout.VerticalAlignment = Enum.VerticalAlignment.Center
-                                        layout.Padding = UDim.new(0, 5)
-                                        layout.Parent = bg
-                                    end
-
-                                    local bg = gui:FindFirstChild('BG')
-                                    if not bg then
-                                        continue
-                                    end
-
-                                    local Items = {}
-
-                                    for _, child in pairs(bg:GetChildren()) do
-                                        if child:IsA('Frame') then
-                                            child:Destroy()
-                                        end
-                                    end
-
-                                    for _, container in pairs({
-                                        v:FindFirstChild('Backpack'),
-                                        v.Character
-                                    }) do
-                                        if container then
-                                            for _, tool in pairs(container:GetChildren()) do
-                                                if tool:IsA('Tool') and not tool:GetAttribute('JobTool') and not tool:GetAttribute('Locked') then
-                                                    local itemFolder = tool:GetAttribute('AmmoType') and ReplicatedStorage.Items.gun or ReplicatedStorage.Items.melee
-                                                    for _, z in pairs(itemFolder:GetChildren()) do
-                                                        if tool:GetAttribute('RarityName') == z:GetAttribute('RarityName') and tool:GetAttribute('RarityPrice') == z:GetAttribute('RarityPrice') then
-                                                            local imageId = z:GetAttribute('ImageId')
-                                                            if imageId then
-                                                                Items[z.Name] = true
-                                                                if not bg:FindFirstChild(z.Name .. '_bg') then
-                                                                    local iconBg = Instance.new('Frame')
-                                                                    iconBg.Name = z.Name .. '_bg'
-                                                                    iconBg.Size = UDim2.new(0, 34, 0, 34)
-                                                                    iconBg.BackgroundColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
-                                                                    iconBg.BackgroundTransparency = 1
-                                                                    iconBg.BorderSizePixel = 0
-                                                                    iconBg.Parent = bg
-
-                                                                    local bgImage = Instance.new('ImageLabel')
-                                                                    bgImage.Name = 'Background'
-                                                                    bgImage.Size = UDim2.new(1, 0, 1, 0)
-                                                                    bgImage.BackgroundTransparency = 1
-                                                                    bgImage.Image = 'rbxassetid://137066731814190'
-                                                                    bgImage.ImageColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
-                                                                    bgImage.ZIndex = 0
-                                                                    bgImage.Parent = iconBg
-
-                                                                    local corner = Instance.new('UICorner')
-                                                                    corner.CornerRadius = UDim.new(0.15, 0)
-                                                                    corner.Parent = iconBg
-
-                                                                    local icon = Instance.new('ImageLabel')
-                                                                    icon.Name = z.Name
-                                                                    icon.Image = imageId
-                                                                    icon.BackgroundTransparency = 1
-                                                                    icon.BorderSizePixel = 0
-                                                                    icon.Size = UDim2.new(0.85, 0, 0.85, 0)
-                                                                    icon.Position = UDim2.new(0.075, 0, 0.075, 0)
-                                                                    icon.Parent = iconBg
-
-                                                                    local corner2 = Instance.new('UICorner')
-                                                                    corner2.CornerRadius = UDim.new(0, 9)
-                                                                    corner2.Parent = icon
-                                                                end
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-
-                                    gui.Enabled = _G.InventoryViewerEnabled
-
-                                    for _, child in pairs(bg:GetChildren()) do
-                                        if child:IsA('Frame') then
-                                            local itemName = child.Name:gsub('_bg$', '')
-                                            if not Items[itemName] then
-                                                child:Destroy()
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end)
-                    end
-                end)
-            end
-        else
-            for _, v in pairs(Players:GetPlayers()) do
-                if v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
-                    local gui = v.Character.HumanoidRootPart:FindFirstChild('ItemBillboard')
-                    if gui then
-                        gui:Destroy()
-                    end
-                end
-            end
-        end
-    end  
-})
 
 local function GetColorFromRarity(rarityName)
     local colors = {
