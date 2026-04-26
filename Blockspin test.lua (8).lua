@@ -1094,6 +1094,119 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+--  Esp items 
+
+
+-- ========== ESP Inventory Viewer (ไอเท็มในกระเป๋าผู้เล่น) ==========
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Client = Players.LocalPlayer
+
+local InventoryESPEnabled = false
+local espLoop = nil
+
+local RarityColors = {
+    Common = Color3.fromRGB(200,200,200),
+    Uncommon = Color3.fromRGB(86,176,62),
+    Rare = Color3.fromRGB(0,162,255),
+    Epic = Color3.fromRGB(170,85,255),
+    Legendary = Color3.fromRGB(255,170,0),
+    Omega = Color3.fromRGB(255,75,75)
+}
+
+local function GetItemImage(itemName)
+    for _, cat in pairs(ReplicatedStorage.Items:GetChildren()) do
+        for _, item in pairs(cat:GetChildren()) do
+            if item.Name == itemName then
+                return item:GetAttribute("ImageId")
+            end
+        end
+    end
+    return nil
+end
+
+local function StartInventoryESP()
+    if espLoop then task.cancel(espLoop) end
+    espLoop = task.spawn(function()
+        while InventoryESPEnabled do
+            task.wait(0.3)
+            for _, plr in pairs(Players:GetPlayers()) do
+                if plr ~= Client and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local root = plr.Character.HumanoidRootPart
+                    local gui = root:FindFirstChild("InventoryESP")
+                    if not gui then
+                        gui = Instance.new("BillboardGui")
+                        gui.Name = "InventoryESP"
+                        gui.Size = UDim2.new(0, 200, 0, 45)
+                        gui.StudsOffset = Vector3.new(0, -3, 0)
+                        gui.AlwaysOnTop = true
+                        gui.Parent = root
+                        
+                        local frame = Instance.new("Frame", gui)
+                        frame.Name = "Frame"
+                        frame.Size = UDim2.new(1,0,1,0)
+                        frame.BackgroundTransparency = 1
+                        
+                        local layout = Instance.new("UIListLayout", frame)
+                        layout.FillDirection = Enum.FillDirection.Horizontal
+                        layout.Padding = UDim.new(0, 3)
+                    end
+                    
+                    local frame = gui.Frame
+                    for _, child in pairs(frame:GetChildren()) do
+                        if child:IsA("Frame") then child:Destroy() end
+                    end
+                    
+                    local itemsShown = {}
+                    local function AddItem(tool)
+                        local rarity = tool:GetAttribute("RarityName") or "Common"
+                        local imgId = GetItemImage(tool.Name)
+                        if imgId and not itemsShown[tool.Name] then
+                            itemsShown[tool.Name] = true
+                            local iconBg = Instance.new("Frame", frame)
+                            iconBg.Size = UDim2.new(0, 30, 0, 30)
+                            iconBg.BackgroundColor3 = RarityColors[rarity] or Color3.fromRGB(255,255,255)
+                            Instance.new("UICorner", iconBg).CornerRadius = UDim.new(0, 6)
+                            
+                            local icon = Instance.new("ImageLabel", iconBg)
+                            icon.Size = UDim2.new(0.8,0,0.8,0)
+                            icon.Position = UDim2.new(0.1,0,0.1,0)
+                            icon.BackgroundTransparency = 1
+                            icon.Image = imgId
+                        end
+                    end
+                    
+                    for _, tool in pairs(plr.Backpack:GetChildren()) do
+                        if tool:IsA("Tool") and not tool:GetAttribute("JobTool") then
+                            AddItem(tool)
+                        end
+                    end
+                    if plr.Character then
+                        for _, tool in pairs(plr.Character:GetChildren()) do
+                            if tool:IsA("Tool") and not tool:GetAttribute("JobTool") then
+                                AddItem(tool)
+                            end
+                        end
+                    end
+                    gui.Enabled = true
+                end
+            end
+        end
+    end)
+end
+
+local function StopInventoryESP()
+    if espLoop then task.cancel(espLoop) espLoop = nil end
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            local gui = plr.Character.HumanoidRootPart:FindFirstChild("InventoryESP")
+            if gui then gui:Destroy() end
+        end
+    end
+end
+
+
+
 
 
 -- Esp items drop
@@ -1617,19 +1730,16 @@ EspTab:Toggle({
 })
 
 
+EspTab:Toggle({
+    Title = "ESP Inventory",
+    Desc = "แสดงไอเท็มในกระเป๋าผู้เล่นคนอื่น",
+    Default = false,
+    Callback = function(state)
+        InventoryESPEnabled = state
+        if state then StartInventoryESP() else StopInventoryESP() end
+    end
+})
 
-
-local function GetColorFromRarity(rarityName)
-    local colors = {
-        ["Common"] = Color3.fromRGB(200, 200, 200),
-        ["Uncommon"] = Color3.fromRGB(86, 176, 62),
-        ["Rare"] = Color3.fromRGB(0, 162, 255),
-        ["Epic"] = Color3.fromRGB(170, 85, 255),
-        ["Legendary"] = Color3.fromRGB(255, 170, 0),
-        ["Omega"] = Color3.fromRGB(255, 75, 75)
-    }
-    return colors[rarityName] or Color3.fromRGB(255, 255, 255)
-end
 
 EspTab:Toggle({
     Title = "ESP Items Drop",
