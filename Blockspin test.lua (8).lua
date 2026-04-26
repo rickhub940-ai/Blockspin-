@@ -1830,7 +1830,7 @@ ChaterTab:Slider({Title = "Jump power valu (ปรับความสูง)",
 
 -- Speed Boost (CFrame Based)
 local speedEnabled = false
-local speedValue = 1
+local speedValue = 0.8
 local speedConnection = nil
 
 local function startSpeed()
@@ -1879,9 +1879,9 @@ ChaterTab:Slider({
     Desc = "ปรับค่าความเร็ว",
     Step = 0.01,
     Value = {
-        Min = 0.8,
+        Min = 0.1,
         Max = 1,
-        Default = 1
+        Default = 0.8
     },
     Callback = function(v)
         speedValue = v
@@ -2220,6 +2220,76 @@ FarmTab:Input({
         end
     end
 })
+
+
+
+
+
+
+local MiscTab = Window:Tab({Title = "MISC", Icon = "settings"})
+
+
+
+
+
+--// Modules
+local CrateController = require(
+    ReplicatedStorage:WaitForChild("Modules")
+        :WaitForChild("Game")
+        :WaitForChild("CrateSystem")
+        :WaitForChild("Crate")
+)
+
+--// Settings
+local EnabledSkip = false
+
+--// Toggle
+MiscTab:Toggle({
+    Title = "Skip Animation",
+    Default = false,
+    Callback = function(v)
+        EnabledSkip = v
+
+        if v then
+            task.spawn(function()
+                while EnabledSkip do
+                    task.wait()
+
+                    -- กัน nil
+                    if not CrateController or not CrateController.class then
+                        continue
+                    end
+
+                    for _, crate in pairs(CrateController.class.objects or {}) do
+                        pcall(function()
+                            if crate.states and crate.states.open then
+                                crate.states.open.set(true)
+                            end
+
+                            if CrateController.skipping then
+                                CrateController.skipping.set(true)
+                            end
+                        end)
+                    end
+
+                    if CrateController.spinning 
+                        and not CrateController.spinning.get() then
+                        pcall(function()
+                            CrateController.skip_spin()
+                        end)
+                    end
+                end
+            end)
+        end
+    end
+})
+
+
+
+
+
+
+
 
 -- Spectator (ถอดจิต)
 local SPEED = 260
