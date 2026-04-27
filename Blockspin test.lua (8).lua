@@ -335,6 +335,79 @@ repeat task.wait() until Done
 
 
 
+
+--// ================= CONFIG SYSTEM ================= \\--
+
+local HttpService = game:GetService("HttpService")
+
+local MainFolder = "Dipper Hub [ Premium Script ]"
+local GameName = "BlockSpin"
+local Folder = MainFolder.."/"..GameName
+
+local Flags = {}
+
+-- สร้างโฟลเดอร์
+if not isfolder(MainFolder) then
+    makefolder(MainFolder)
+end
+
+if not isfolder(Folder) then
+    makefolder(Folder)
+end
+
+-- ดึงรายชื่อ config
+local function GetConfigs()
+    local files = listfiles(Folder)
+    local names = {}
+
+    for _,file in pairs(files) do
+        local name = file:match(".+/([^/]+)%.json$")
+        if name then
+            table.insert(names, name)
+        end
+    end
+
+    return names
+end
+
+-- save
+local function SaveConfig(name)
+    if name == "" then return end
+    writefile(Folder.."/"..name..".json", HttpService:JSONEncode(Flags))
+end
+
+-- load
+local function LoadConfig(name)
+    local path = Folder.."/"..name..".json"
+    if isfile(path) then
+        Flags = HttpService:JSONDecode(readfile(path))
+    end
+end
+
+-- apply ค่าเข้า UI
+local function ApplyConfig()
+    for flag,value in pairs(Flags) do
+        WindUI:SetValue(flag, value)
+    end
+end
+
+
+
+
+
+
+--// ================= COMBAT TAB ================= \\--
+
+
+
+
+--// ================= CONFIG TAB ================= \\--
+
+
+
+
+
+
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
@@ -1810,11 +1883,16 @@ end
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
+
+
 CombatTab:Toggle({
     Title = "Silent Aim",
-    Default = SilentAimEnabled,
+    Flag = "SilentAim",
+    Default = Flags.SilentAim or false,
     Callback = function(v)
+        Flags.SilentAim = v
         SilentAimEnabled = v
+
         if not v then
             billboard.Enabled = false
             tracer.Visible = false
@@ -1826,10 +1904,12 @@ CombatTab:Toggle({
 
 CombatTab:Toggle({
     Title = "Show FOV",
-    Description = "แสดงวง FOV",
-    Default = ShowFOV,
+    Flag = "ShowFOV",
+    Default = Flags.ShowFOV or false,
     Callback = function(v)
+        Flags.ShowFOV = v
         ShowFOV = v
+
         if not SilentAimEnabled then
             fovCircle.Visible = false
         end
@@ -1838,26 +1918,32 @@ CombatTab:Toggle({
 
 CombatTab:Slider({
     Title = "FOV Size",
+    Flag = "FOVSize",
     Step = 1,
     Value = {
         Min = 50,
         Max = 500,
-        Default = FOV
+        Default = Flags.FOVSize or 100
     },
     Callback = function(v)
+        Flags.FOVSize = v
         FOV = v
     end
 })
 
 CombatTab:Dropdown({
     Title = "Aim Part",
-    Description = "เลือกส่วนที่จะเล็ง",
+    Flag = "AimPart",
     Values = { "Head", "HumanoidRootPart", "Torso" },
-    Default = "Head",
+    Default = Flags.AimPart or "Head",
     Callback = function(selected)
+        Flags.AimPart = selected
         AimPart = selected
     end
 })
+
+
+
 
 local function GetPlayerNames()
     local t = {}
@@ -2854,6 +2940,63 @@ MiscTab:Toggle({
 
 
 
+
+
+
+local ConfigTab = Window:Tab({ Title = "Config" })
+
+
+
+local CurrentName = ""
+local SelectedConfig = nil
+
+-- ตั้งชื่อ
+ConfigTab:Input({
+    Title = "Config Name",
+    Placeholder = "ใส่ชื่อ...",
+    Callback = function(v)
+        CurrentName = v
+    end
+})
+
+-- dropdown
+local ConfigDropdown = ConfigTab:Dropdown({
+    Title = "Select Config",
+    Values = GetConfigs(),
+    Callback = function(v)
+        SelectedConfig = v
+    end
+})
+
+-- save
+ConfigTab:Button({
+    Title = "Save Config",
+    Callback = function()
+        if CurrentName ~= "" then
+            SaveConfig(CurrentName)
+            ConfigDropdown:Refresh(GetConfigs())
+        end
+    end
+})
+
+-- load
+ConfigTab:Button({
+    Title = "Load Config",
+    Callback = function()
+        if SelectedConfig then
+            LoadConfig(SelectedConfig)
+            ApplyConfig()
+        end
+    end
+})
+
+-- refresh
+ConfigTab:Button({
+    Title = "Refresh List",
+    Callback = function()
+        ConfigDropdown:Refresh(GetConfigs())
+    end
+})
 
 
 -- Spectator (ถอดจิต)
