@@ -2659,32 +2659,40 @@ local function HideName()
     end
 end
 
+--// ===== CHATER TAB FULL CONFIG ===== \\--
+
+-- Hide Name
 ChaterTab:Toggle({
     Title = "Hide Name",
-    Desc = "ปิดชื่อ(ปิดแค่เราคนเดียวคนอื่นเห็นเหมือนเดิม)",
-    Default = false,
+    Desc = "ปิดชื่อ (เห็นเฉพาะเรา)",
+    Flag = "HideName",
+    Default = Flags.HideName or false,
     Callback = function(state)
+        Flags.HideName = state
         hideNameEnabled = state
-        if state then
-            HideName()
-        end
+        if state then HideName() end
     end
 })
 
-LocalPlayer.CharacterAdded:Connect(function(character)
+LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.5)
-    if hideNameEnabled then
+    if Flags.HideName then
         HideName()
     end
 end)
 
+-- Auto Pickup
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
 local pick
+
 ChaterTab:Toggle({
     Title = "Auto Pickup item",
     Desc = "ดูดของ",
-    Default = false,
+    Flag = "AutoPickup",
+    Default = Flags.AutoPickup or false,
     Callback = function(state)
+        Flags.AutoPickup = state
+
         if state then
             pick = task.spawn(function()
                 while task.wait() do
@@ -2707,20 +2715,23 @@ ChaterTab:Toggle({
     end
 })
 
+-- Desync
 local plsraknet = Raknet or raknet
-if not plsraknet then return end
 
 ChaterTab:Toggle({
-    Title = "Desync is op ",
+    Title = "Desync is op",
     Desc = "ล่องหน",
-    Default = false,
+    Flag = "Desync",
+    Default = Flags.Desync or false,
     Callback = function(state)
+        Flags.Desync = state
         if plsraknet and plsraknet.desync then
             plsraknet.desync(state)
         end
     end
 })
 
+-- Anti Ragdoll Hook
 local OldGet = RagdollModule.is_ragdolling.get
 
 RagdollModule.is_ragdolling.get = function(...)
@@ -2735,45 +2746,60 @@ end
 
 ChaterTab:Toggle({
     Title = "Anti Ragdoll",
-    Desc = "กันกระเดนเปิดแล้วจะไม่กระเดน",
+    Desc = "กันกระเด็น",
     Flag = "AntiRagdoll",
-    Value = false,
+    Default = Flags.AntiRagdoll or false,
     Callback = function(Value)
+        Flags.AntiRagdoll = Value
         _G.AntiRagdoll = Value
     end
 })
 
-
-
-
+-- Snap System
 ChaterTab:Toggle({
     Title = "Snap Under Map",
     Desc = "มุดดิน",
-    Default = false,
+    Flag = "SnapEnable",
+    Default = Flags.SnapEnable or false,
     Callback = function(state)
-        if state then StartSnap() else StopSnap() end
+        Flags.SnapEnable = state
+        if state then
+            StartSnap()
+        else
+            StopSnap()
+        end
     end
 })
 
 ChaterTab:Slider({
     Title = "Snap Depth",
-    Desc = "ความลึกในการมุด",
+    Desc = "ความลึก",
+    Flag = "SnapDepth",
     Step = 1,
-    Value = { Min = 1, Max = 50, Default = 10 },
+    Value = {
+        Min = 1,
+        Max = 50,
+        Default = Flags.SnapDepth or 10
+    },
     Callback = function(value)
+        Flags.SnapDepth = value
         SnapDepth = value
     end
 })
 
 ChaterTab:Keybind({
     Title = "Snap Keybind",
-    Desc = "ปุ่มลัดเปิดปิดมุดดิน",
-    Value = "G",
+    Desc = "ปุ่มลัด",
+    Flag = "SnapKey",
+    Value = Flags.SnapKey or "G",
     Callback = function()
-        if SnapEnabled then StopSnap() else StartSnap() end
+        if SnapEnabled then
+            StopSnap()
+        else
+            StartSnap()
+        end
     end
 })
-
 
 
 
