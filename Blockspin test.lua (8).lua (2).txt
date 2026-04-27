@@ -2507,15 +2507,21 @@ EspTab:Toggle({
 
 local ChaterTab = Window:Tab({Title = "Character", Icon = "user"})
 
+
+
 ChaterTab:Divider()
 ChaterTab:Section({Title = "Body"})
 
-local staminaConnection
+local staminaConnection = nil
+
+-- Infinity Stamina
+local infiniteStamina = Get("infiniteStamina", false)
 ChaterTab:Toggle({
     Title = "infinity stamina",
     Desc = "สตามิน่าไม่จำกัด",
-    Default = false,
+    Default = infiniteStamina,
     Callback = function(state)
+        Save("infiniteStamina", state)
         if state then
             if not getgenv().Bypassed then
                 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
@@ -2558,25 +2564,43 @@ ChaterTab:Toggle({
     end
 })
 
-ChaterTab:Toggle({Title = "jump power (กระโดดสูง)", Default = false, Callback = function(state)
-    jumpEnabled = state
-    if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
-    if state then
-        jumpConnection = UserInputService.JumpRequest:Connect(function()
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, jumpPower, char.HumanoidRootPart.Velocity.Z)
-            end
-        end)
+-- Jump Power
+local jumpEnabled = Get("jumpEnabled", false)
+local jumpPower = Get("jumpPower", 70)
+local jumpConnection = nil
+
+ChaterTab:Toggle({
+    Title = "jump power (กระโดดสูง)",
+    Default = jumpEnabled,
+    Callback = function(state)
+        jumpEnabled = state
+        Save("jumpEnabled", state)
+        if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
+        if state then
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, jumpPower, char.HumanoidRootPart.Velocity.Z)
+                end
+            end)
+        end
     end
-end})
+})
 
-ChaterTab:Slider({Title = "Jump power valu (ปรับความสูง)", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
+ChaterTab:Slider({
+    Title = "Jump power valu (ปรับความสูง)",
+    Step = 5,
+    Value = { Min = 20, Max = 80, Default = jumpPower },
+    Callback = function(v)
+        jumpPower = v
+        Save("jumpPower", v)
+    end
+})
 
-
-local speedEnabled = false
-local speedValue = 0.8
+-- Speed Boost
+local speedEnabled = Get("speedEnabled", false)
+local speedValue = Get("speedValue", 0.8)
 local speedConnection = nil
 
 local function startSpeed()
@@ -2606,9 +2630,10 @@ end
 ChaterTab:Toggle({
     Title = "Speed Boost",
     Desc = "เพิ่มความเร็วในการเคลื่อนที่",
-    Default = false,
+    Default = speedEnabled,
     Callback = function(state)
         speedEnabled = state
+        Save("speedEnabled", state)
         if state then
             startSpeed()
         else
@@ -2624,54 +2649,39 @@ ChaterTab:Slider({
     Title = "Speed Value",
     Desc = "ปรับค่าความเร็ว",
     Step = 0.01,
-    Value = {
-        Min = 0.1,
-        Max = 1,
-        Default = 0.8
-    },
+    Value = { Min = 0.1, Max = 1, Default = speedValue },
     Callback = function(v)
         speedValue = v
-    end
-})
-
-CombatTab:Toggle({
-    Title = "Anti Aim Assistant",
-	Desc = "กันล็อค",
-    Default = getgenv().AntiAimAssiant,
-    Callback = function(v)
-        getgenv().AntiAimAssiant = v
+        Save("speedValue", v)
     end
 })
 
 ChaterTab:Divider()
 ChaterTab:Section({Title = "Mod"})
+
+-- Anti Kill
+local antiKillEnabled = Get("antiKillEnabled", false)
 local AntiKillToggle = ChaterTab:Toggle({
     Title = "Anti Kill",
-	Desc = "กันตาย",
-    Default = false,
+    Desc = "กันตาย",
+    Default = antiKillEnabled,
     Callback = function(state)
         enabled = state
+        Save("antiKillEnabled", state)
         if state then
             if WindUI then
-                WindUI:Notify({
-                    Title = "Anti Kill Enabled",
-                    Description = "",
-                    Duration = 3
-                })
+                WindUI:Notify({ Title = "Anti Kill Enabled", Description = "", Duration = 3 })
             end
         else
             if WindUI then
-                WindUI:Notify({
-                    Title = "Anti Kill Disabled",
-                    Description = "",
-                    Duration = 3
-                })
+                WindUI:Notify({ Title = "Anti Kill Disabled", Description = "", Duration = 3 })
             end
         end
     end
 })
 
-local hideNameEnabled = false
+-- Hide Name
+local hideNameEnabled = Get("hideNameEnabled", false)
 
 local function HideName()
     if not hideNameEnabled then return end
@@ -2693,9 +2703,10 @@ end
 ChaterTab:Toggle({
     Title = "Hide Name",
     Desc = "ปิดชื่อ(ปิดแค่เราคนเดียวคนอื่นเห็นเหมือนเดิม)",
-    Default = false,
+    Default = hideNameEnabled,
     Callback = function(state)
         hideNameEnabled = state
+        Save("hideNameEnabled", state)
         if state then
             HideName()
         end
@@ -2709,13 +2720,18 @@ LocalPlayer.CharacterAdded:Connect(function(character)
     end
 end)
 
+-- Auto Pickup item
+local autoPickupEnabled = Get("autoPickupEnabled", false)
 local DroppedFolder = workspace:FindFirstChild("DroppedItems")
-local pick
+local pick = nil
+
 ChaterTab:Toggle({
     Title = "Auto Pickup item",
     Desc = "ดูดของ",
-    Default = false,
+    Default = autoPickupEnabled,
     Callback = function(state)
+        autoPickupEnabled = state
+        Save("autoPickupEnabled", state)
         if state then
             pick = task.spawn(function()
                 while task.wait() do
@@ -2738,6 +2754,7 @@ ChaterTab:Toggle({
     end
 })
 
+-- Desync
 local plsraknet = nil
 if Raknet or raknet then 
     plsraknet = Raknet or raknet 
@@ -2745,24 +2762,26 @@ else
     print("executor your not supported")
 end
 
-local Toggled = false
-
+local desyncEnabled = Get("desyncEnabled", false)
+local Toggled = desyncEnabled
 
 ChaterTab:Toggle({
     Title = "Desync is op ",
     Desc = "ล่องหน",
-    Default = false,
+    Default = desyncEnabled,
     Callback = function(state)
         Toggled = state
+        Save("desyncEnabled", state)
         if not plsraknet then return end
-        local function updateToggle(s)
-            if plsraknet and plsraknet.desync then
-                plsraknet.desync(s)
-            end
+        if plsraknet and plsraknet.desync then
+            plsraknet.desync(state)
         end
-        updateToggle(Toggled)
     end
 })
+
+-- Anti Ragdoll
+local antiRagdollEnabled = Get("antiRagdollEnabled", false)
+_G.AntiRagdoll = antiRagdollEnabled
 
 local OldGet = RagdollModule.is_ragdolling.get
 
@@ -2780,20 +2799,53 @@ ChaterTab:Toggle({
     Title = "Anti Ragdoll",
     Desc = "กันกระเดนเปิดแล้วจะไม่กระเดน",
     Flag = "AntiRagdoll",
-    Value = false,
+    Value = antiRagdollEnabled,
     Callback = function(Value)
         _G.AntiRagdoll = Value
+        Save("antiRagdollEnabled", Value)
     end
 })
 
+-- Snap Under Map
+local snapUnderMapEnabled = Get("snapUnderMapEnabled", false)
+local snapDepth = Get("snapDepth", 10)
+local snapThread = nil
 
+local function StartSnap()
+    if SnapEnabled then return end
+    SnapEnabled = true
+    
+    if snapThread then task.cancel(snapThread) end
+    
+    snapThread = task.spawn(function()
+        local baseY = nil
+        while SnapEnabled do
+            task.wait(0.01)
+            local char = CharModule.get()
+            local hrp = CharModule.get_hrp()
+            if char and hrp then
+                if not baseY then baseY = hrp.Position.Y end
+                local deltaY = (baseY - snapDepth) - hrp.Position.Y
+                char:PivotTo(hrp.CFrame * CFrame.new(0, deltaY, 0))
+            else
+                baseY = nil
+            end
+        end
+    end)
+end
 
+local function StopSnap()
+    SnapEnabled = false
+    if snapThread then task.cancel(snapThread) snapThread = nil end
+end
 
 ChaterTab:Toggle({
     Title = "Snap Under Map",
     Desc = "มุดดิน",
-    Default = false,
+    Default = snapUnderMapEnabled,
     Callback = function(state)
+        snapUnderMapEnabled = state
+        Save("snapUnderMapEnabled", state)
         if state then StartSnap() else StopSnap() end
     end
 })
@@ -2802,9 +2854,10 @@ ChaterTab:Slider({
     Title = "Snap Depth",
     Desc = "ความลึกในการมุด",
     Step = 1,
-    Value = { Min = 1, Max = 50, Default = 10 },
+    Value = { Min = 1, Max = 50, Default = snapDepth },
     Callback = function(value)
-        SnapDepth = value
+        snapDepth = value
+        Save("snapDepth", value)
     end
 })
 
