@@ -335,6 +335,47 @@ repeat task.wait() until Done
 
 
 
+
+
+
+
+
+-- ==================== CONFIG SYSTEM ====================
+local HttpService = game:GetService("HttpService")
+local ConfigFile = "Dipper_HUB_Block spin Config.json"
+local Config = {}
+
+if isfile(ConfigFile) then
+    local success, data = pcall(function()
+        return HttpService:JSONDecode(readfile(ConfigFile))
+    end)
+    if success and data then
+        Config = data
+    end
+end
+
+local function Get(name, defaultValue)
+    if Config[name] == nil then
+        Config[name] = defaultValue
+    end
+    return Config[name]
+end
+
+local function Save(name, value)
+    Config[name] = value
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode(Config)
+    end)
+    if success then
+        writefile(ConfigFile, encoded)
+    end
+end
+
+
+
+
+
+
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
@@ -1810,11 +1851,15 @@ end
 
 local CombatTab = Window:Tab({Title = "COMBAT", Icon = "swords"})
 
+
+-- Silent Aim
+local SilentAimEnabled = Get("SilentAimEnabled", false)
 CombatTab:Toggle({
     Title = "Silent Aim",
     Default = SilentAimEnabled,
     Callback = function(v)
         SilentAimEnabled = v
+        Save("SilentAimEnabled", v)  -- <-- บันทึก
         if not v then
             billboard.Enabled = false
             tracer.Visible = false
@@ -1824,18 +1869,23 @@ CombatTab:Toggle({
     end
 })
 
+-- Show FOV
+local ShowFOV = Get("ShowFOV", false)
 CombatTab:Toggle({
     Title = "Show FOV",
     Description = "แสดงวง FOV",
     Default = ShowFOV,
     Callback = function(v)
         ShowFOV = v
+        Save("ShowFOV", v)  -- <-- บันทึก
         if not SilentAimEnabled then
             fovCircle.Visible = false
         end
     end
 })
 
+-- FOV Size
+local FOV = Get("FOV", 200)
 CombatTab:Slider({
     Title = "FOV Size",
     Step = 1,
@@ -1846,19 +1896,24 @@ CombatTab:Slider({
     },
     Callback = function(v)
         FOV = v
+        Save("FOV", v)  -- <-- บันทึก
     end
 })
 
+-- Aim Part
+local AimPart = Get("AimPart", "Head")
 CombatTab:Dropdown({
     Title = "Aim Part",
     Description = "เลือกส่วนที่จะเล็ง",
     Values = { "Head", "HumanoidRootPart", "Torso" },
-    Default = "Head",
+    Default = AimPart,
     Callback = function(selected)
         AimPart = selected
+        Save("AimPart", selected)  -- <-- บันทึก
     end
 })
 
+-- Save Friend
 local function GetPlayerNames()
     local t = {}
     for _, plr in pairs(Players:GetPlayers()) do
@@ -1869,13 +1924,15 @@ local function GetPlayerNames()
     return t
 end
 
+local savedFriends = Get("SavedFriends", {})
 CombatTab:Dropdown({
     Title = "Save Friend",
     Description = "เลือกเพื่อนที่จะไม่ถูกเล็ง",
     Values = GetPlayerNames(),
     Multi = true,
-    Default = {},
+    Default = savedFriends,
     Callback = function(selected)
+        Save("SavedFriends", selected)  -- <-- บันทึก
         for _, plr in pairs(Players:GetPlayers()) do
             plr:SetAttribute("SilentAimIgnore", false)
         end
@@ -1885,6 +1942,19 @@ CombatTab:Dropdown({
                 plr:SetAttribute("SilentAimIgnore", true)
             end
         end
+    end
+})
+
+-- Anti Aim Assistant
+local AntiAimAssiant = Get("AntiAimAssiant", false)
+getgenv().AntiAimAssiant = AntiAimAssiant
+CombatTab:Toggle({
+    Title = "Anti Aim Assistant",
+    Desc = "กันล็อค",
+    Default = AntiAimAssiant,
+    Callback = function(v)
+        getgenv().AntiAimAssiant = v
+        Save("AntiAimAssiant", v)  -- <-- บันทึก
     end
 })
 
