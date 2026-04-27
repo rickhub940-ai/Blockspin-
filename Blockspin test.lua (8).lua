@@ -1981,7 +1981,16 @@ CombatTab:Dropdown({
 
 
 
-
+CombatTab:Toggle({
+    Title = "Anti Aim Assistant",
+    Desc = "กันล็อค",
+    Flag = "AntiAimAssist",
+    Default = Flags.AntiAimAssist or false,
+    Callback = function(v)
+        Flags.AntiAimAssist = v
+        getgenv().AntiAimAssiant = v
+    end
+})
 
 
 
@@ -2449,11 +2458,15 @@ ChaterTab:Divider()
 ChaterTab:Section({Title = "Body"})
 
 local staminaConnection
+
 ChaterTab:Toggle({
     Title = "infinity stamina",
     Desc = "สตามิน่าไม่จำกัด",
-    Default = false,
+    Flag = "InfStamina",
+    Default = Flags.InfStamina or false,
     Callback = function(state)
+        Flags.InfStamina = state
+
         if state then
             if not getgenv().Bypassed then
                 local NetModule = require(ReplicatedStorage.Modules.Core.Net)
@@ -2496,26 +2509,52 @@ ChaterTab:Toggle({
     end
 })
 
-ChaterTab:Toggle({Title = "jump power (กระโดดสูง)", Default = false, Callback = function(state)
-    jumpEnabled = state
-    if jumpConnection then jumpConnection:Disconnect() jumpConnection = nil end
-    if state then
-        jumpConnection = UserInputService.JumpRequest:Connect(function()
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                char.HumanoidRootPart.Velocity = Vector3.new(char.HumanoidRootPart.Velocity.X, jumpPower, char.HumanoidRootPart.Velocity.Z)
-            end
-        end)
+ChaterTab:Toggle({
+    Title = "jump power (กระโดดสูง)",
+    Flag = "JumpEnable",
+    Default = Flags.JumpEnable or false,
+    Callback = function(state)
+        Flags.JumpEnable = state
+        jumpEnabled = state
+
+        if jumpConnection then
+            jumpConnection:Disconnect()
+            jumpConnection = nil
+        end
+
+        if state then
+            jumpConnection = UserInputService.JumpRequest:Connect(function()
+                local char = LocalPlayer.Character
+                if char and char:FindFirstChild("HumanoidRootPart") then
+                    char.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+                    char.HumanoidRootPart.Velocity = Vector3.new(
+                        char.HumanoidRootPart.Velocity.X,
+                        jumpPower,
+                        char.HumanoidRootPart.Velocity.Z
+                    )
+                end
+            end)
+        end
     end
-end})
+})
 
-ChaterTab:Slider({Title = "Jump power valu (ปรับความสูง)", Step = 5, Value = {Min = 20, Max = 80, Default = 70}, Callback = function(v) jumpPower = v end})
+ChaterTab:Slider({
+    Title = "Jump power valu",
+    Flag = "JumpPower",
+    Step = 5,
+    Value = {
+        Min = 20,
+        Max = 80,
+        Default = Flags.JumpPower or 70
+    },
+    Callback = function(v)
+        Flags.JumpPower = v
+        jumpPower = v
+    end
+})
 
 
-local speedEnabled = false
-local speedValue = 0.8
-local speedConnection = nil
+
 
 local function startSpeed()
     if speedConnection then 
@@ -2535,18 +2574,20 @@ local function startSpeed()
         if humanoid and rootPart and humanoid.MoveDirection.Magnitude > 0 then
             local dir = humanoid.MoveDirection
             local moveAmount = (speedValue / 4) * (dt * 60)
-            local newCFrame = rootPart.CFrame + (dir.Unit * moveAmount)
-            rootPart.CFrame = newCFrame
+            rootPart.CFrame += (dir.Unit * moveAmount)
         end
     end)
 end
 
 ChaterTab:Toggle({
     Title = "Speed Boost",
-    Desc = "เพิ่มความเร็วในการเคลื่อนที่",
-    Default = false,
+    Desc = "เพิ่มความเร็ว",
+    Flag = "SpeedEnable",
+    Default = Flags.SpeedEnable or false,
     Callback = function(state)
+        Flags.SpeedEnable = state
         speedEnabled = state
+
         if state then
             startSpeed()
         else
@@ -2560,54 +2601,44 @@ ChaterTab:Toggle({
 
 ChaterTab:Slider({
     Title = "Speed Value",
-    Desc = "ปรับค่าความเร็ว",
+    Flag = "SpeedValue",
     Step = 0.01,
     Value = {
         Min = 0.1,
         Max = 1,
-        Default = 0.8
+        Default = Flags.SpeedValue or 0.8
     },
     Callback = function(v)
+        Flags.SpeedValue = v
         speedValue = v
     end
 })
 
-CombatTab:Toggle({
-    Title = "Anti Aim Assistant",
-	Desc = "กันล็อค",
-    Default = getgenv().AntiAimAssiant,
-    Callback = function(v)
-        getgenv().AntiAimAssiant = v
-    end
-})
+
+
+
 
 ChaterTab:Divider()
 ChaterTab:Section({Title = "Mod"})
-local AntiKillToggle = ChaterTab:Toggle({
+
+ChaterTab:Toggle({
     Title = "Anti Kill",
-	Desc = "กันตาย",
-    Default = false,
+    Desc = "กันตาย",
+    Flag = "AntiKill",
+    Default = Flags.AntiKill or false,
     Callback = function(state)
+        Flags.AntiKill = state
         enabled = state
-        if state then
-            if WindUI then
-                WindUI:Notify({
-                    Title = "Anti Kill Enabled",
-                    Description = "",
-                    Duration = 3
-                })
-            end
-        else
-            if WindUI then
-                WindUI:Notify({
-                    Title = "Anti Kill Disabled",
-                    Description = "",
-                    Duration = 3
-                })
-            end
+
+        if WindUI then
+            WindUI:Notify({
+                Title = state and "Anti Kill Enabled" or "Anti Kill Disabled",
+                Duration = 3
+            })
         end
     end
 })
+
 
 local hideNameEnabled = false
 
