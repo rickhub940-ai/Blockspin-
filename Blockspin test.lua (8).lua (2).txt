@@ -2117,13 +2117,21 @@ local function Stop()
     CurrentGunLabel:SetDesc("None")
 end
 
---// ================= UI =================
 
+
+local CurrentGunLabel = WeaponTab:Button({
+    Title = "Current Gun",
+    Desc = "None"
+})
+
+-- Enable Gun Mod
+local GunModEnabled = Get("GunModEnabled", false)
 WeaponTab:Toggle({
     Title = "Enable Gun Mod",
-    Default = false,
+    Default = GunModEnabled,
     Callback = function(v)
         GunModSettings.Enabled = v
+        Save("GunModEnabled", v)
         if v then
             Start()
         else
@@ -2134,63 +2142,77 @@ WeaponTab:Toggle({
 
 WeaponTab:Divider()
 
+-- Inf Accuracy
+local InfAccuracy = Get("InfAccuracy", true)
 WeaponTab:Toggle({
     Title = "Inf Accuracy",
-    Default = true,
+    Default = InfAccuracy,
     Callback = function(v)
         GunModSettings.accuracy = v and math.huge or 1
+        Save("InfAccuracy", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
 
+-- Inf Range
+local InfRange = Get("InfRange", true)
 WeaponTab:Toggle({
     Title = "Inf Range",
-    Default = true,
+    Default = InfRange,
     Callback = function(v)
         GunModSettings.range = v and math.huge or 100
+        Save("InfRange", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
 
+-- No Recoil
+local NoRecoil = Get("NoRecoil", true)
 WeaponTab:Toggle({
     Title = "No Recoil",
-    Default = true,
+    Default = NoRecoil,
     Callback = function(v)
         GunModSettings.Recoil = v and 0 or 1
+        Save("NoRecoil", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
 
+-- Inf Fire Rate
+local InfFireRate = Get("InfFireRate", true)
 WeaponTab:Toggle({
     Title = "Inf Fire Rate",
-    Default = true,
+    Default = InfFireRate,
     Callback = function(v)
         GunModSettings.fire_rate = v and math.huge or 0.1
+        Save("InfFireRate", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
 
+-- Min Reload
+local MinReload = Get("MinReload", true)
 WeaponTab:Toggle({
     Title = "Min Reload",
-    Default = true,
+    Default = MinReload,
     Callback = function(v)
         GunModSettings.reload_time = v and 0 or 2
+        Save("MinReload", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
 
+-- Automatic
+local Automatic = Get("Automatic", true)
 WeaponTab:Toggle({
     Title = "Automatic",
-    Default = true,
+    Default = Automatic,
     Callback = function(v)
         GunModSettings.automatic = v
+        Save("Automatic", v)
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
-
-
-
-
 
 
 
