@@ -2135,11 +2135,15 @@ end
 
 --// ================= UI =================
 
+
 WeaponTab:Toggle({
     Title = "Enable Gun Mod",
-    Default = false,
+    Flag = "GunModEnabled",
+    Default = Flags.GunModEnabled or false,
     Callback = function(v)
+        Flags.GunModEnabled = v
         GunModSettings.Enabled = v
+
         if v then
             Start()
         else
@@ -2152,8 +2156,10 @@ WeaponTab:Divider()
 
 WeaponTab:Toggle({
     Title = "Inf Accuracy",
-    Default = true,
+    Flag = "InfAccuracy",
+    Default = Flags.InfAccuracy ~= false,
     Callback = function(v)
+        Flags.InfAccuracy = v
         GunModSettings.accuracy = v and math.huge or 1
         if GunModSettings.Enabled then UpdateAll() end
     end
@@ -2161,8 +2167,10 @@ WeaponTab:Toggle({
 
 WeaponTab:Toggle({
     Title = "Inf Range",
-    Default = true,
+    Flag = "InfRange",
+    Default = Flags.InfRange ~= false,
     Callback = function(v)
+        Flags.InfRange = v
         GunModSettings.range = v and math.huge or 100
         if GunModSettings.Enabled then UpdateAll() end
     end
@@ -2170,8 +2178,10 @@ WeaponTab:Toggle({
 
 WeaponTab:Toggle({
     Title = "No Recoil",
-    Default = true,
+    Flag = "NoRecoil",
+    Default = Flags.NoRecoil ~= false,
     Callback = function(v)
+        Flags.NoRecoil = v
         GunModSettings.Recoil = v and 0 or 1
         if GunModSettings.Enabled then UpdateAll() end
     end
@@ -2179,8 +2189,10 @@ WeaponTab:Toggle({
 
 WeaponTab:Toggle({
     Title = "Inf Fire Rate",
-    Default = true,
+    Flag = "InfFireRate",
+    Default = Flags.InfFireRate ~= false,
     Callback = function(v)
+        Flags.InfFireRate = v
         GunModSettings.fire_rate = v and math.huge or 0.1
         if GunModSettings.Enabled then UpdateAll() end
     end
@@ -2188,8 +2200,10 @@ WeaponTab:Toggle({
 
 WeaponTab:Toggle({
     Title = "Min Reload",
-    Default = true,
+    Flag = "MinReload",
+    Default = Flags.MinReload ~= false,
     Callback = function(v)
+        Flags.MinReload = v
         GunModSettings.reload_time = v and 0 or 2
         if GunModSettings.Enabled then UpdateAll() end
     end
@@ -2197,15 +2211,14 @@ WeaponTab:Toggle({
 
 WeaponTab:Toggle({
     Title = "Automatic",
-    Default = true,
+    Flag = "Automatic",
+    Default = Flags.Automatic ~= false,
     Callback = function(v)
+        Flags.Automatic = v
         GunModSettings.automatic = v
         if GunModSettings.Enabled then UpdateAll() end
     end
 })
-
-
-
 
 
 
