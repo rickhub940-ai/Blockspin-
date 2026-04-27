@@ -2228,40 +2228,61 @@ local EspTab = Window:Tab({Title = "ESP", Icon = "eye"})
 EspTab:Toggle({
     Title = "Box ESP",
     Desc = "กล่องสี่เหลี่ยมทุกคน",
-    Default = false,
-    Callback = function(state) boxESPEnabled = state end
+    Flag = "BoxESP",
+    Default = Flags.BoxESP or false,
+    Callback = function(state)
+        Flags.BoxESP = state
+        boxESPEnabled = state
+    end
 })
 
 EspTab:Toggle({
     Title = "Name ESP",
     Desc = "แสดงชื่อคนทั้งหมด",
-    Default = false,
-    Callback = function(state) nameESPEnabled = state end
+    Flag = "NameESP",
+    Default = Flags.NameESP or false,
+    Callback = function(state)
+        Flags.NameESP = state
+        nameESPEnabled = state
+    end
 })
 
 EspTab:Toggle({
     Title = "Health ESP",
-    Desc = "แสดงแถบเลือดของทุดคน",
-    Default = false,
-    Callback = function(state) healthESPEnabled = state end
+    Desc = "แสดงแถบเลือดของทุกคน",
+    Flag = "HealthESP",
+    Default = Flags.HealthESP or false,
+    Callback = function(state)
+        Flags.HealthESP = state
+        healthESPEnabled = state
+    end
 })
 
 EspTab:Toggle({
     Title = "Distance ESP",
     Desc = "แสดงระยะห่างจากทุกคน",
-    Default = false,
-    Callback = function(state) distanceESPEnabled = state end
+    Flag = "DistanceESP",
+    Default = Flags.DistanceESP or false,
+    Callback = function(state)
+        Flags.DistanceESP = state
+        distanceESPEnabled = state
+    end
 })
 
 EspTab:Toggle({
     Title = "Highlight",
     Desc = "ไฮไลท์สีขาวบนตัวทุกคน",
-    Default = false,
+    Flag = "HighlightESP",
+    Default = Flags.HighlightESP or false,
     Callback = function(state)
+        Flags.HighlightESP = state
         highlightEnabled = state
+
         if not state then
             for _, hl in pairs(highlights) do
-                if hl and hl.Destroy then pcall(function() hl:Destroy() end) end
+                if hl and hl.Destroy then
+                    pcall(function() hl:Destroy() end)
+                end
             end
             highlights = {}
         end
@@ -2270,173 +2291,127 @@ EspTab:Toggle({
 
 
 EspTab:Toggle({
-	Title = 'Esp Inventory',
-	Desc = "แสดงของในกระเป๋าทุกคน",
-	Default = true,
-	Callback = function(Value)
-		_G.InventoryViewerEnabled = Value
-		local Players = game:GetService('Players')
-		local ReplicatedStorage = game:GetService('ReplicatedStorage')
-		local Client = Players.LocalPlayer
-		local function GetColorFromRarity(rarityName)
-			local colors = {
-				["Common"] = Color3.fromRGB(200, 200, 200),
-				["Uncommon"] = Color3.fromRGB(86, 176, 62),
-				["Rare"] = Color3.fromRGB(0, 162, 255),
-				["Epic"] = Color3.fromRGB(170, 85, 255),
-				["Legendary"] = Color3.fromRGB(255, 170, 0),
-				["Omega"] = Color3.fromRGB(255, 75, 75)
-			}
-			return colors[rarityName] or Color3.fromRGB(255, 255, 255)
-		end
+    Title = 'Esp Inventory',
+    Desc = "แสดงของในกระเป๋าทุกคน",
+    Flag = "InventoryESP",
+    Default = Flags.InventoryESP ~= false,
+    Callback = function(Value)
+        Flags.InventoryESP = Value
+        _G.InventoryViewerEnabled = Value
 
-		if Value then
-			if not _G.ViewerRunning then
-				_G.ViewerRunning = true
-				task.spawn(function()
-					while task.wait(0.2) do
-						if not _G.InventoryViewerEnabled then
-							continue
-						end
-						pcall(function()
-							for _, v in pairs(Players:GetPlayers()) do
-								if v ~= Client and v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
-									local root = v.Character.HumanoidRootPart
-									local gui = root:FindFirstChild('ItemBillboard')
-									if not gui then
-										gui = Instance.new('BillboardGui')
-										gui.Name = 'ItemBillboard'
-										gui.AlwaysOnTop = true
-										gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-										gui.Size = UDim2.new(0, 200, 0, 50)
-										gui.StudsOffset = Vector3.new(0, -5, 0)
-										gui.ExtentsOffset = Vector3.new(0, 1, 0)
-										gui.LightInfluence = 1
-										gui.Parent = root
+        local Players = game:GetService('Players')
+        local ReplicatedStorage = game:GetService('ReplicatedStorage')
+        local Client = Players.LocalPlayer
 
-										local bg = Instance.new('Frame')
-										bg.Name = 'BG'
-										bg.BackgroundTransparency = 1
-										bg.Size = UDim2.new(1, 0, 1, 0)
-										bg.AnchorPoint = Vector2.new(0.5, 0.5)
-										bg.Position = UDim2.new(0.5, 0, 0.5, 0)
-										bg.Parent = gui
+        local function GetColorFromRarity(rarityName)
+            local colors = {
+                ["Common"] = Color3.fromRGB(200, 200, 200),
+                ["Uncommon"] = Color3.fromRGB(86, 176, 62),
+                ["Rare"] = Color3.fromRGB(0, 162, 255),
+                ["Epic"] = Color3.fromRGB(170, 85, 255),
+                ["Legendary"] = Color3.fromRGB(255, 170, 0),
+                ["Omega"] = Color3.fromRGB(255, 75, 75)
+            }
+            return colors[rarityName] or Color3.fromRGB(255, 255, 255)
+        end
 
-										local layout = Instance.new('UIListLayout')
-										layout.FillDirection = Enum.FillDirection.Horizontal
-										layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-										layout.VerticalAlignment = Enum.VerticalAlignment.Center
-										layout.Padding = UDim.new(0, 5)
-										layout.Parent = bg
-									end
+        if Value then
+            if not _G.ViewerRunning then
+                _G.ViewerRunning = true
+                task.spawn(function()
+                    while task.wait(0.2) do
+                        if not _G.InventoryViewerEnabled then continue end
 
-									local bg = gui:FindFirstChild('BG')
-									if not bg then
-										continue
-									end
+                        pcall(function()
+                            for _, v in pairs(Players:GetPlayers()) do
+                                if v ~= Client and v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
+                                    local root = v.Character.HumanoidRootPart
+                                    local gui = root:FindFirstChild('ItemBillboard')
 
-									local Items = {}
+                                    if not gui then
+                                        gui = Instance.new('BillboardGui')
+                                        gui.Name = 'ItemBillboard'
+                                        gui.AlwaysOnTop = true
+                                        gui.Size = UDim2.new(0, 200, 0, 50)
+                                        gui.StudsOffset = Vector3.new(0, -5, 0)
+                                        gui.Parent = root
 
-									for _, child in pairs(bg:GetChildren()) do
-										if child:IsA('Frame') then
-											child:Destroy()
-										end
-									end
+                                        local bg = Instance.new('Frame')
+                                        bg.Name = 'BG'
+                                        bg.BackgroundTransparency = 1
+                                        bg.Size = UDim2.new(1, 0, 1, 0)
+                                        bg.Parent = gui
 
-									-- loop item เนเธ backpack + character
-									for _, container in pairs({
-										v:FindFirstChild('Backpack'),
-										v.Character
-									}) do
-										if container then
-											for _, tool in pairs(container:GetChildren()) do
-												if tool:IsA('Tool') and not tool:GetAttribute('JobTool') and not tool:GetAttribute('Locked') then
-													local itemFolder = tool:GetAttribute('AmmoType') and ReplicatedStorage.Items.gun or ReplicatedStorage.Items.melee
-													for _, z in pairs(itemFolder:GetChildren()) do
-														if tool:GetAttribute('RarityName') == z:GetAttribute('RarityName') and tool:GetAttribute('RarityPrice') == z:GetAttribute('RarityPrice') then
-															local imageId = z:GetAttribute('ImageId')
-															if imageId then
-																Items[z.Name] = true
-																if not bg:FindFirstChild(z.Name .. '_bg') then
-																	local iconBg = Instance.new('Frame')
-																	iconBg.Name = z.Name .. '_bg'
-																	iconBg.Size = UDim2.new(0, 34, 0, 34)
-																	iconBg.BackgroundColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
-																	iconBg.BackgroundTransparency = 1
-																	iconBg.BorderSizePixel = 0
-																	iconBg.Parent = bg
+                                        local layout = Instance.new('UIListLayout')
+                                        layout.FillDirection = Enum.FillDirection.Horizontal
+                                        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+                                        layout.VerticalAlignment = Enum.VerticalAlignment.Center
+                                        layout.Padding = UDim.new(0, 5)
+                                        layout.Parent = bg
+                                    end
 
-																	local bgImage = Instance.new('ImageLabel')
-																	bgImage.Name = 'Background'
-																	bgImage.Size = UDim2.new(1, 0, 1, 0)
-																	bgImage.BackgroundTransparency = 1
-																	bgImage.Image = 'rbxassetid://137066731814190'
-																	bgImage.ImageColor3 = GetColorFromRarity(z:GetAttribute('RarityName'))
-																	bgImage.ZIndex = 0
-																	bgImage.Parent = iconBg
+                                    local bg = gui:FindFirstChild('BG')
+                                    if not bg then continue end
 
-																	local corner = Instance.new('UICorner')
-																	corner.CornerRadius = UDim.new(0.15, 0)
-																	corner.Parent = iconBg
+                                    for _, child in pairs(bg:GetChildren()) do
+                                        if child:IsA('Frame') then
+                                            child:Destroy()
+                                        end
+                                    end
 
-																	local icon = Instance.new('ImageLabel')
-																	icon.Name = z.Name
-																	icon.Image = imageId
-																	icon.BackgroundTransparency = 1
-																	icon.BorderSizePixel = 0
-																	icon.Size = UDim2.new(0.85, 0, 0.85, 0)
-																	icon.Position = UDim2.new(0.075, 0, 0.075, 0)
-																	icon.Parent = iconBg
+                                    local Items = {}
 
-																	local corner2 = Instance.new('UICorner')
-																	corner2.CornerRadius = UDim.new(0, 9)
-																	corner2.Parent = icon
-																end
-															end
-														end
-													end
-												end
-											end
-										end
-									end
+                                    for _, container in pairs({
+                                        v:FindFirstChild('Backpack'),
+                                        v.Character
+                                    }) do
+                                        if container then
+                                            for _, tool in pairs(container:GetChildren()) do
+                                                if tool:IsA('Tool') then
+                                                    local name = tool.Name
+                                                    Items[name] = true
 
-									gui.Enabled = _G.InventoryViewerEnabled
+                                                    if not bg:FindFirstChild(name) then
+                                                        local label = Instance.new("TextLabel")
+                                                        label.Name = name
+                                                        label.Text = name
+                                                        label.Size = UDim2.new(0, 80, 0, 20)
+                                                        label.BackgroundTransparency = 1
+                                                        label.TextScaled = true
+                                                        label.Parent = bg
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
 
-									for _, child in pairs(bg:GetChildren()) do
-										if child:IsA('Frame') then
-											local itemName = child.Name:gsub('_bg$', '')
-											if not Items[itemName] then
-												child:Destroy()
-											end
-										end
-									end
-								end
-							end
-						end)
-					end
-				end)
-			end
-		else
-			for _, v in pairs(Players:GetPlayers()) do
-				if v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
-					local gui = v.Character.HumanoidRootPart:FindFirstChild('ItemBillboard')
-					if gui then
-						gui:Destroy()
-					end
-				end
-			end
-		end
-	end  
+                                    gui.Enabled = _G.InventoryViewerEnabled
+                                end
+                            end
+                        end)
+                    end
+                end)
+            end
+        else
+            for _, v in pairs(Players:GetPlayers()) do
+                if v.Character and v.Character:FindFirstChild('HumanoidRootPart') then
+                    local gui = v.Character.HumanoidRootPart:FindFirstChild('ItemBillboard')
+                    if gui then gui:Destroy() end
+                end
+            end
+        end
+    end
 })
-
 
 
 
 EspTab:Toggle({
     Title = "ESP Items Drop",
     Desc = "แสดงไอเทมที่ตกพื้น",
-    Default = false,
+    Flag = "DropESP",
+    Default = Flags.DropESP or false,
     Callback = function(state)
+        Flags.DropESP = state
         espEnabled = state
         updateAllESP()
     end
@@ -2444,12 +2419,13 @@ EspTab:Toggle({
 
 EspTab:Dropdown({
     Title = "Hide Rarity items drop",
-    Desc = "เลือกระดับที่จะไม่แสดง สำหรับไอเท็มดรอบ",
+    Desc = "เลือกระดับที่จะไม่แสดง",
+    Flag = "HideRarity",
     Values = { "Money", "Common", "Uncommon", "Rare", "Epic", "Legendary", "Omega" },
-    Value = {},
+    Default = Flags.HideRarity or {},
     Multi = true,
-    AllowNone = true,
     Callback = function(option)
+        Flags.HideRarity = option
         hiddenRarities = option
         updateAllESP()
     end
@@ -2458,8 +2434,10 @@ EspTab:Dropdown({
 EspTab:Toggle({
     Title = "ESP Anti aim",
     Desc = "แสดงคนที่เปิดกันล็อค",
-    Default = false,
+    Flag = "AntiAimESP",
+    Default = Flags.AntiAimESP or false,
     Callback = function(state)
+        Flags.AntiAimESP = state
         AntiAimEnabled = state
         updateAllESPVisibility()
     end
