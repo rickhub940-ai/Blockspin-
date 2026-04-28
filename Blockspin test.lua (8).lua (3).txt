@@ -2694,31 +2694,34 @@ ChaterTab:Toggle({
     end
 })
 
-local plsraknet = nil
-if Raknet or raknet then 
-    plsraknet = Raknet or raknet 
-else
-    print("executor your not supported")
-end
+local plsraknet = Raknet or raknet
 
-local Toggled = false
+local Toggled = s:g("Char.desync", false)
 
-Toggled = s:g("Char.desync", false)
 ChaterTab:Toggle({
     Title = "Desync is op",
     Desc = "ล่องหน",
-    Default = Toggled,
+    Icon = "bird",
+    Type = "Checkbox",
+    Value = Toggled,
     Callback = function(v)
         Toggled = v
         s:s("Char.desync", v)
 
-        if not plsraknet then return end
-
-        if plsraknet.desync then
+        if plsraknet and plsraknet.desync then
             plsraknet.desync(v)
+        else
+            local StarterGui = game:GetService("StarterGui")
+            StarterGui:SetCore("SendNotification", {
+                Title = "Error",
+                Text = "ตัวรันนี้ไม่รองรับ desync function",
+                Duration = 3
+            })
         end
     end
 })
+
+
 
 local OldGet = RagdollModule.is_ragdolling.get
 
