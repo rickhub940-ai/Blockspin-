@@ -1750,11 +1750,42 @@ end)
 
 getgenv().AntiAimAssiant = false
 
-
-local Client = Players.LocalPlayer
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 local Char = require(game.ReplicatedStorage.Modules.Core.Char)
 
+-- ตัวแปรเก็บสถานะการนั่งในรถ และสถานะของ Anti Aim ก่อนขึ้นรถ
+local wasInVehicle = false
+local wasAntiAimEnabledBeforeVehicle = false
+
 RunService.Heartbeat:Connect(function()
+    local seatPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.SeatPart
+    
+    -- ถ้าผู้เล่นนั่งในรถ
+    if seatPart then
+        if not wasInVehicle then
+            -- ถ้าผู้เล่นขึ้นรถ, เก็บสถานะ Anti Aim ก่อนขึ้นรถ
+            wasAntiAimEnabledBeforeVehicle = getgenv().AntiAimAssiant
+            -- ปิด Anti Aim ทันทีเมื่อขึ้นรถ
+            getgenv().AntiAimAssiant = false
+            wasInVehicle = true
+            print("ขึ้นรถแล้ว! Anti Aim ถูกปิด")
+        end
+    else
+        if wasInVehicle then
+            -- ถ้าผู้เล่นลงจากรถ, กู้คืนสถานะ Anti Aim ก่อนหน้านี้
+            getgenv().AntiAimAssiant = wasAntiAimEnabledBeforeVehicle
+            wasInVehicle = false
+            if getgenv().AntiAimAssiant then
+                print("ลงจากรถแล้ว! Anti Aim ถูกเปิด")
+            else
+                print("ลงจากรถแล้ว! Anti Aim ยังคงปิด")
+            end
+        end
+    end
+
+    -- เช็คการทำงานของ Anti Aim
     if getgenv().AntiAimAssiant then
         local HumanoidModule = Char.get_hum()
 
@@ -1792,6 +1823,8 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+
+
 
 
 -- มุดดิน
@@ -2577,6 +2610,7 @@ ChaterTab:Slider({
     end
 })
 
+
 CombatTab:Toggle({
     Title = "Anti Aim Assistant",
     Desc = "กันล็อค",
@@ -2584,8 +2618,14 @@ CombatTab:Toggle({
     Callback = function(v)
         getgenv().AntiAimAssiant = v
         s:s("Combat.antiaim", v)
+        if v then
+            print("Anti Aim ถูกเปิด")
+        else
+            print("Anti Aim ถูกปิด")
+        end
     end
 })
+
 
 ChaterTab:Divider()
 ChaterTab:Section({Title = "Mod"})
