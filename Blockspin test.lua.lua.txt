@@ -2618,68 +2618,30 @@ ChaterTab:Toggle({
     end
 })
 
-local Toggled = false
-local plsraknet = nil
+local plsraknet = Raknet or raknet
 
-if Raknet or raknet then 
-plsraknet = Raknet or raknet 
-end
+local Toggled = s:g("Char.desync", false)
 
-local UIS = game:GetService("UserInputService")
-
-local DragLoaded = false
-
-ChaterTab:Toggle({
-    Title = "Desync is op ",
+ChaterTabTab:Toggle({
+    Title = "Desync is op",
     Desc = "ล่องหน",
-    Default = false,
-    Callback = function(state)
-        Toggled = state
+    Icon = "bird",
+    Type = "Checkbox",
+    Value = Toggled,
+    Callback = function(v)
+        Toggled = v
+        s:s("Char.desync", v)
 
-        if DragLoaded then return end
-        DragLoaded = true
-
-        local dragging = false
-        local dragInput, dragStart, startPos
-
-        Frame.InputBegan:Connect(function(input)
-            if not Toggled then return end
-
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                dragStart = input.Position
-                startPos = Frame.Position
-
-                input.Changed:Connect(function()
-                    if input.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
-            end
-        end)
-
-        Frame.InputChanged:Connect(function(input)
-            if not Toggled then return end
-
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                dragInput = input
-            end
-        end)
-
-        UIS.InputChanged:Connect(function(input)
-            if not Toggled then return end
-
-            if input == dragInput and dragging then
-                local delta = input.Position - dragStart
-
-                Frame.Position = UDim2.new(
-                    startPos.X.Scale,
-                    startPos.X.Offset + delta.X,
-                    startPos.Y.Scale,
-                    startPos.Y.Offset + delta.Y
-                )
-            end
-        end)
+        if plsraknet and plsraknet.desync then
+            plsraknet.desync(v)
+        else
+            local StarterGui = game:GetService("StarterGui")
+            StarterGui:SetCore("SendNotification", {
+                Title = "Error",
+                Text = "ตัวรันนี้ไม่รองรับ desync function",
+                Duration = 3
+            })
+        end
     end
 })
 
