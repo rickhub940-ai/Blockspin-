@@ -1741,11 +1741,35 @@ end)
 
 getgenv().AntiAimAssiant = false
 
-
-local Client = Players.LocalPlayer
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
 local Char = require(game.ReplicatedStorage.Modules.Core.Char)
 
+local wasInVehicle = false
+local wasAntiAimEnabledBeforeVehicle = false
+
 RunService.Heartbeat:Connect(function()
+    local seatPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character.Humanoid.SeatPart
+    
+    if seatPart then
+        if not wasInVehicle then
+            wasAntiAimEnabledBeforeVehicle = getgenv().AntiAimAssiant
+            getgenv().AntiAimAssiant = false
+            wasInVehicle = true
+        end
+    else
+        if wasInVehicle then
+            -- ถ้าผู้เล่นลงจากรถ, กู้คืนสถานะ Anti Aim ก่อนหน้านี้
+            getgenv().AntiAimAssiant = wasAntiAimEnabledBeforeVehicle
+            wasInVehicle = false
+            if getgenv().AntiAimAssiant then
+            else
+            end
+        end
+    end
+
+    
     if getgenv().AntiAimAssiant then
         local HumanoidModule = Char.get_hum()
 
@@ -1783,6 +1807,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+
 
 
 -- มุดดิน
@@ -2515,11 +2540,15 @@ ChaterTab:Slider({
 })
 
 CombatTab:Toggle({
-    Title = "Anti Aim Assistant",
-	Desc = "กันล็อค",
+    Title = "Anti Aim ",
+    Desc = "กันล็อค",
     Default = getgenv().AntiAimAssiant,
     Callback = function(v)
         getgenv().AntiAimAssiant = v
+        s:s("Combat.antiaim", v)
+        if v then
+        else
+        end
     end
 })
 
