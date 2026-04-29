@@ -361,9 +361,9 @@ local Window = WindUI:CreateWindow({
     Resizable = true,
 })
 Window:Tag({
-    Title = "v0.0.1",
+    Title = "v1.2",
     Icon = "github",
-    Color = Color3.fromHex("#00bfff"),
+    Color = Color3.fromHex("#ffffff"),
     Radius = 5,
 })
 
