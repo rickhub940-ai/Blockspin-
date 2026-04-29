@@ -351,26 +351,14 @@ s:loadc()
 
 local player = game.Players.LocalPlayer
 
-local avatar = "https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds="
-..player.UserId.."&size=420x420&format=Png"
-
 local Window = WindUI:CreateWindow({
-    Title = "Dipper HUB | Premium [ BLOCK SPIN] ",
+    Title = "Dipper HUB | Premium [ BLOCK SPIN ] ",
     Author = "Dipper TEAM",
     Folder = "N HUB",
-    Size = UDim2.fromOffset(700, 540),
-    Background = "rbxassetid://124013844566613",
+    Size = UDim2.fromOffset(500, 850),
+    Background = "Dark",
     Transparent = true,
     Resizable = true,
-
-    User = {
-        Enabled = true,
-        Custom = {
-            Name = "Anonymous",
-            Bio = "RickHUB USER",
-            Image = avatar
-        }
-    }
 })
 Window:Tag({
     Title = "v0.0.1",
@@ -3049,6 +3037,176 @@ MiscTab:Toggle({
 if EnabledSkip then
     startSkip()
 end
+
+
+
+
+
+
+
+
+
+
+
+local serverTab = Window:Tab({Title = "Server", Icon = "lucide:server"})
+
+
+
+
+
+local CodeBox1 = serverTab:Code({
+    Title = "SERVER_INFO",
+    Code = "Loading...",
+})
+
+-- [[ ส่วนของ Input & Buttons ]]
+local JobIDInput = ""
+
+serverTab:Input({
+    Title = "Job ID",
+    Placeholder = "Paste Job ID here...",
+    Callback = function(v) 
+        JobIDInput = v 
+    end,
+})
+
+serverTab:Button({
+    Title = "Join Job ID",
+    Desc = "จอยไอดีเซิฟ",
+    Callback = function()
+        if JobIDInput ~= "" then
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, JobIDInput, game.Players.LocalPlayer)
+        end
+    end,
+})
+
+serverTab:Button({
+    Title = "Copy  Job ID",
+    Desc = "คัดลอกไอดีเซิฟเวอร์",
+    Callback = function()
+        setclipboard(game.JobId)
+        WindUI:Notify({
+            Title = "Success",
+            Content = "Job ID Copied!",
+            Type = "Success"
+        })
+    end,
+})
+
+
+local function ServerHop(sortOrder)
+    local Http = game:GetService("HttpService")
+    local TPS = game:GetService("TeleportService")
+    local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder="..sortOrder.."&limit=100"
+    
+    local success, result = pcall(function()
+        return Http:JSONDecode(game:HttpGet(Api))
+    end)
+    
+    if success and result.data then
+        for _, v in pairs(result.data) do
+            if v.playing < v.maxPlayers and v.id ~= game.JobId then
+                TPS:TeleportToPlaceInstance(game.PlaceId, v.id, game.Players.LocalPlayer)
+                break
+            end
+        end
+    end
+end
+
+serverTab:Button({ 
+    Title = "Hop New Server", 
+    Desc = "ย้ายไปเซิฟใหม่",
+    Callback = function() ServerHop("Desc") end 
+})
+
+serverTab:Button({ 
+    Title = "Hop Low Player Server",
+    Desc = "ย้ายไปเซิฟคนน้อย",
+    Callback = function() ServerHop("Asc") end 
+})
+
+serverTab:Button({
+    Title = "Hop Low Ping Server",
+    Desc = "ย้ายไปเซิฟปิงน้อบ",
+    Callback = function()
+        ServerHop("Desc") 
+    end,
+})
+
+-- [[ ASCII SNAKE ANIMATION LOGIC ]]
+local Players = game:GetService("Players")
+local Stats = game:GetService("Stats")
+
+local width = 62 
+local innerWidth = width - 2
+local leaderChar = "C"
+local trailCount = 14
+local trailSpacing = 1
+local speed = 0.08
+
+local function replaceAt(str, i, c)
+    return str:sub(1, i-1) .. c .. str:sub(i+1)
+end
+
+local function createLine(l, v)
+    local res = string.rep(" ", 3) .. l .. string.rep(" ", 9 - #l) .. " : " .. tostring(v)
+    local pad = innerWidth - #res
+    return "|" .. res .. string.rep(" ", (pad > 0 and pad or 0)) .. "|"
+end
+
+local function buildPath()
+    local p = {}
+    for x = 1, width do table.insert(p, {l="t", i=x}) end
+    for y = 1, 5 do table.insert(p, {l="l", r=y}) end
+    for x = width, 1, -1 do table.insert(p, {l="b", i=x}) end
+    for y = 5, 1, -1 do table.insert(p, {l="r", r=y}) end
+    return p
+end
+
+local path = buildPath()
+
+local function makeFrame(hPos)
+    local jobId = (game.JobId ~= "" and game.JobId or "Local-Server")
+    local pCount = #Players:GetPlayers()
+    local ping = 0
+    pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+
+    local top = "+" .. string.rep("-", innerWidth) .. "+"
+    local btm = "+" .. string.rep("-", innerWidth) .. "+"
+    local m = {
+        createLine("Job id", jobId),
+        createLine("Player", pCount.."/"..Players.MaxPlayers),
+        createLine("Ping", ping.." ms"),
+        "|" .. string.rep(" ", innerWidth) .. "|",
+        "|" .. string.rep(" ", innerWidth) .. "|"
+    }
+
+    local function apply(pos, c)
+        local pt = path[((pos-1) % #path) + 1]
+        if pt.l == "t" then top = replaceAt(top, pt.i, c)
+        elseif pt.l == "b" then btm = replaceAt(btm, pt.i, c)
+        elseif pt.l == "l" then m[pt.r] = replaceAt(m[pt.r], 1, c)
+        elseif pt.l == "r" then m[pt.r] = replaceAt(m[pt.r], width, c) end
+    end
+
+    for i = trailCount, 1, -1 do
+        apply(hPos - (i * trailSpacing), (i % 2 == 0 and "*" or "-"))
+    end
+    apply(hPos, leaderChar)
+
+    return table.concat({top, m[1], m[2], m[3], m[4], m[5], btm}, "\n")
+end
+
+task.spawn(function()
+    local p = 1
+    while task.wait(speed) do
+        local ok, f = pcall(function() return makeFrame(p) end)
+        if ok then 
+            CodeBox1:SetCode(f) 
+        end
+        p = (p % #path) + 1
+    end
+end)
 
 
 
